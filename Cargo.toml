@@ -1,0 +1,15 @@
+[workspace]
+members = ["programs/escape_from_delta"]
+resolver = "2"
+
+[workspace.package]
+edition = "2021"
+license = "UNLICENSED"
+publish = false
+
+[workspace.dependencies]
+anchor-lang = { version = "0.30.1", features = ["init-if-needed"] }
+anchor-spl = "0.30.1"
+
+[profile.release]
+overflow-checks = true

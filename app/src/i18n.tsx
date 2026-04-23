@@ -1,0 +1,280 @@
+"use client";
+
+import { createContext, type ReactNode, useContext, useMemo, useState } from "react";
+
+export type Language = "en" | "zh";
+
+export const copy = {
+  en: {
+    languageButton: "中文",
+    wallet: {
+      disconnect: "Disconnect",
+      connect: "Connect Wallet",
+      connecting: "Connecting...",
+      connectTitle: "Connect Phantom wallet",
+      connectingTitle: "Waiting for wallet signature",
+      rejected: "Wallet rejected the transaction.",
+    },
+    nav: {
+      play: "Play",
+      marketplace: "Marketplace",
+      warehouse: "Warehouse",
+      records: "Battle Records",
+    },
+    home: {
+      eyebrow: "On-chain extraction raid",
+      hero: "Gear up, open containers, survive the fight, and extract with what you can keep.",
+      mainActions: "Main actions",
+      sceneLabel: "Equipped operator in extraction zone",
+    },
+    common: {
+      edcoins: "EDcoins",
+      armor: "Armor",
+      weapon: "Weapon",
+      armorBalance: "Armor-point balance",
+      weaponBalance: "Weapon-point balance",
+      characterLabel: "character equipment tier",
+      noActiveListings: "No active listings.",
+      none: "none",
+    },
+    conversion: {
+      title: "EDcoins",
+      aria: "SOL to EDcoins conversion",
+      description: "1 SOL credits 10000 EDcoins.",
+      button: "Convert SOL",
+    },
+    play: {
+      eyebrow: "Live raid",
+      title: "Play",
+      route: "Route",
+      lowRisk: "Low Risk",
+      mediumRisk: "Medium Risk",
+      highRisk: "High Risk",
+      lowEncounter: "10% base encounter",
+      mediumEncounter: "30% base encounter",
+      highEncounter: "50% base encounter",
+      startRaid: "Start Raid",
+      land: "Land",
+      encounter: "Encounter",
+      winBattle: "Win Battle",
+      moveMedium: "Move Medium",
+      extract: "Extract",
+      failRaid: "Fail Raid",
+      sceneLabel: "Raid extraction area",
+      difficulty: "Difficulty",
+      standardDemo: "Standard Demo",
+      loadout: "Loadout",
+      raidStatus: "Raid Status",
+      area: "Area",
+      status: "Status",
+      actions: "Actions",
+      safeCase: "Safe Case",
+      safeCaseHelp: "Select up to the safe-case capacity before failure settlement.",
+      extracted: "Extracted",
+      raidFailed: "Raid Failed",
+      battleRecord: "Battle record",
+    },
+    warehouse: {
+      eyebrow: "Inventory",
+      title: "Warehouse",
+      balances: "Balances",
+      storage: "Storage",
+      safeCases: "Safe cases",
+      collectibles: "Collectibles",
+      raidRecords: "raid records",
+      custody: "Custody",
+      walletOwned: "wallet owned",
+    },
+    records: {
+      eyebrow: "History",
+      title: "Battle Records",
+      empty: "No completed raids.",
+      raid: "Raid",
+      result: "Result",
+      retained: "Retained",
+      lost: "Lost",
+      randomAudit: "Random audit",
+      noRandomEvents: "No random events.",
+      results: {
+        succeeded: "succeeded",
+        failed: "failed",
+        timed_out: "timed out",
+      },
+    },
+    marketplace: {
+      eyebrow: "Trade",
+      title: "Marketplace",
+      price: "Price",
+      fee: "Fee: 3% rounded up before listing activation.",
+      createListing: "Create Listing",
+      listings: "Listings",
+    },
+    admin: {
+      eyebrow: "Operator tools",
+      title: "Admin",
+      description: "Authorized deployer wallet can create difficulty versions.",
+      entryFee: "Entry fee",
+      createDifficulty: "Create Difficulty",
+    },
+  },
+  zh: {
+    languageButton: "English",
+    wallet: {
+      disconnect: "断开连接",
+      connect: "连接钱包",
+      connecting: "连接中...",
+      connectTitle: "连接 Phantom 钱包",
+      connectingTitle: "等待钱包签名",
+      rejected: "钱包拒绝了交易。",
+    },
+    nav: {
+      play: "开始游戏",
+      marketplace: "交易",
+      warehouse: "仓库",
+      records: "战绩查询",
+    },
+    home: {
+      eyebrow: "链上搜打撤",
+      hero: "带上装备，开启容器，打赢遭遇战，带着能保住的战利品撤离。",
+      mainActions: "主要功能",
+      sceneLabel: "撤离区中的已装备角色",
+    },
+    common: {
+      edcoins: "EDcoins",
+      armor: "护甲",
+      weapon: "武器",
+      armorBalance: "护甲参数余额",
+      weaponBalance: "武器参数余额",
+      characterLabel: "角色装备等级",
+      noActiveListings: "暂无上架物品。",
+      none: "无",
+    },
+    conversion: {
+      title: "EDcoins",
+      aria: "SOL 兑换 EDcoins",
+      description: "1 SOL 可兑换 10000 EDcoins。",
+      button: "兑换 SOL",
+    },
+    play: {
+      eyebrow: "进行中的行动",
+      title: "开始游戏",
+      route: "路线",
+      lowRisk: "低风险区",
+      mediumRisk: "中风险区",
+      highRisk: "高风险区",
+      lowEncounter: "10% 基础遭遇概率",
+      mediumEncounter: "30% 基础遭遇概率",
+      highEncounter: "50% 基础遭遇概率",
+      startRaid: "开始行动",
+      land: "落地",
+      encounter: "遭遇敌人",
+      winBattle: "战斗胜利",
+      moveMedium: "前往中风险区",
+      extract: "撤离",
+      failRaid: "行动失败",
+      sceneLabel: "行动撤离区域",
+      difficulty: "难度",
+      standardDemo: "标准演示",
+      loadout: "携带装备",
+      raidStatus: "行动状态",
+      area: "区域",
+      status: "状态",
+      actions: "可选操作",
+      safeCase: "安全箱",
+      safeCaseHelp: "失败结算前，可按安全箱容量选择保留物品。",
+      extracted: "已撤离",
+      raidFailed: "行动失败",
+      battleRecord: "战绩记录",
+    },
+    warehouse: {
+      eyebrow: "库存",
+      title: "仓库",
+      balances: "余额",
+      storage: "存储",
+      safeCases: "安全箱",
+      collectibles: "收藏品",
+      raidRecords: "行动记录",
+      custody: "托管状态",
+      walletOwned: "钱包持有",
+    },
+    records: {
+      eyebrow: "历史",
+      title: "战绩查询",
+      empty: "暂无已完成行动。",
+      raid: "行动",
+      result: "结果",
+      retained: "保留",
+      lost: "丢失",
+      randomAudit: "随机审计",
+      noRandomEvents: "暂无随机事件。",
+      results: {
+        succeeded: "成功撤离",
+        failed: "失败",
+        timed_out: "超时",
+      },
+    },
+    marketplace: {
+      eyebrow: "交易",
+      title: "交易",
+      price: "价格",
+      fee: "手续费：上架前收取价格的 3%，向上取整。",
+      createListing: "创建上架",
+      listings: "上架列表",
+    },
+    admin: {
+      eyebrow: "管理员工具",
+      title: "管理员",
+      description: "授权的部署钱包可以创建难度版本。",
+      entryFee: "入场费",
+      createDifficulty: "创建难度",
+    },
+  },
+} as const;
+
+interface LanguageState {
+  language: Language;
+  t: typeof copy.en;
+  toggleLanguage: () => void;
+}
+
+const LanguageContext = createContext<LanguageState | null>(null);
+
+export function LanguageProvider({ children }: { children: ReactNode }) {
+  const [language, setLanguage] = useState<Language>("en");
+  const value = useMemo(
+    () => ({
+      language,
+      t: copy[language],
+      toggleLanguage: () => setLanguage((current) => (current === "en" ? "zh" : "en")),
+    }),
+    [language],
+  );
+  return <LanguageContext.Provider value={value}>{children}</LanguageContext.Provider>;
+}
+
+export function useI18n() {
+  const value = useContext(LanguageContext);
+  if (!value) {
+    throw new Error("LanguageProvider is missing");
+  }
+  return value;
+}
+
+export function translateWalletError(error: string | null, language: Language): string | null {
+  if (!error) return null;
+  if (language === "en") return error;
+  if (error.includes("Phantom wallet was not detected")) {
+    return "未检测到 Phantom 钱包。请通过 http://127.0.0.1:3000 或 HTTPS 打开页面，并启用 Phantom 扩展。";
+  }
+  const knownErrors: Record<string, string> = {
+    "wallet-connect-failed": "钱包连接失败。",
+    "wallet-signing-not-supported": "当前钱包不支持签名交易。",
+    "transaction-build-failed": "交易构造失败。",
+    "wallet-transaction-failed": "钱包交易失败。",
+    "transaction-confirmation-timeout": "交易确认超时。",
+    "signature-status-timeout": "查询签名状态超时。",
+    "block-height-timeout": "查询区块高度超时。",
+    "wallet-initialization-failed": "钱包初始化失败。",
+  };
+  return knownErrors[error] ?? `交易错误：${error}`;
+}

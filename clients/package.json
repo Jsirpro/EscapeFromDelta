@@ -1,0 +1,20 @@
+{
+  "name": "@escape-from-delta/clients",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "scripts": {
+    "generate": "echo client generation is provided by Anchor IDL in later tasks",
+    "test": "vitest run tests",
+    "query:records": "tsx scripts/query-battle-records.ts",
+    "demo:local": "tsx scripts/run-local-demo.ts"
+  },
+  "dependencies": {
+    "@coral-xyz/anchor": "^0.30.1",
+    "@solana/kit": "^2.0.0"
+  },
+  "devDependencies": {
+    "tsx": "^4.16.0"
+  }
+}
