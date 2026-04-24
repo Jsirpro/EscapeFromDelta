@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 
 import { fetchPlayerProfileByWallet } from "../../../../../../clients/src/queries/localnet";
 
-const PROGRAM_ID = process.env.NEXT_PUBLIC_PROGRAM_ID ?? process.env.PROGRAM_ID ?? "11111111111111111111111111111111";
+const PROGRAM_ID =
+  process.env.NEXT_PUBLIC_PROGRAM_ID ?? process.env.PROGRAM_ID ?? "7ueVgYfrwidjpwMCBfGyHCoVpaVNe7Ep1h2Mxv1ENBYQ";
 
 export async function GET(_request: Request, context: { params: { wallet: string } }) {
   try {

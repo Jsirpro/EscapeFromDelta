@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use session_keys::{session_auth_or, Session, SessionError, SessionToken};
 
 use crate::errors::EscapeError;
 use crate::instructions::effective_encounter_chance;
@@ -8,15 +9,14 @@ use crate::state::{
     SEED_PLAYER, SEED_RAID,
 };
 
-#[derive(Accounts)]
+#[derive(Accounts, Session)]
 pub struct MoveArea<'info> {
     #[account(mut)]
-    pub player: Signer<'info>,
+    pub signer: Signer<'info>,
     #[account(
         mut,
-        seeds = [SEED_PLAYER, player.key().as_ref()],
+        seeds = [SEED_PLAYER, player_profile.wallet.as_ref()],
         bump = player_profile.bump,
-        constraint = player_profile.wallet == player.key() @ EscapeError::Unauthorized,
         constraint = player_profile.active_raid == Some(raid_session.key()) @ EscapeError::InvalidRaidState
     )]
     pub player_profile: Account<'info, PlayerProfile>,
@@ -27,8 +27,17 @@ pub struct MoveArea<'info> {
         constraint = raid_session.player_profile == player_profile.key() @ EscapeError::Unauthorized
     )]
     pub raid_session: Account<'info, RaidSession>,
+    #[session(
+        signer = signer,
+        authority = player_profile.wallet.key()
+    )]
+    pub session_token: Option<Account<'info, SessionToken>>,
 }
 
+#[session_auth_or(
+    ctx.accounts.player_profile.wallet.key() == ctx.accounts.signer.key(),
+    SessionError::InvalidToken
+)]
 pub fn handler(ctx: Context<MoveArea>, target_area: RiskLevel) -> Result<()> {
     let now = Clock::get()?.unix_timestamp;
     let raid_session = &mut ctx.accounts.raid_session;

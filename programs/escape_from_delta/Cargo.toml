@@ -20,3 +20,4 @@ default = []
 [dependencies]
 anchor-lang.workspace = true
 anchor-spl.workspace = true
+session-keys = { version = "3.0.11", features = ["no-entrypoint"] }

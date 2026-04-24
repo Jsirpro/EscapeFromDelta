@@ -8,6 +8,7 @@ export interface RaidUiState {
 
 export type RaidUiAction =
   | { type: "start" }
+  | { type: "reset" }
   | { type: "landed" }
   | { type: "encounter" }
   | { type: "win" }
@@ -23,6 +24,8 @@ export const initialRaidUiState: RaidUiState = {
 
 export function raidReducer(state: RaidUiState, action: RaidUiAction): RaidUiState {
   switch (action.type) {
+    case "reset":
+      return initialRaidUiState;
     case "start":
       return { ...state, status: "transitioning", availableActions: [] };
     case "landed":

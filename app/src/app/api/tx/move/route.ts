@@ -1,11 +1,16 @@
 import { NextResponse } from "next/server";
 
-import { buildMoveAreaTransaction } from "../../../../lib/local-demo";
+import { buildMoveAreaTransaction, buildSessionMoveAreaTransaction } from "../../../../lib/local-demo";
 
 const RISK_AREAS = new Set(["low", "medium", "high"]);
 
 export async function POST(request: Request) {
-  const payload = (await request.json()) as { player?: string; area?: string };
+  const payload = (await request.json()) as {
+    player?: string;
+    area?: string;
+    sessionSigner?: string;
+    sessionToken?: string;
+  };
   if (!payload.player) {
     return NextResponse.json({ error: "missing-player" }, { status: 400 });
   }
@@ -13,6 +18,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "invalid-area" }, { status: 400 });
   }
   try {
+    if (payload.sessionSigner && payload.sessionToken) {
+      return NextResponse.json(
+        await buildSessionMoveAreaTransaction(
+          payload.player,
+          payload.sessionSigner,
+          payload.sessionToken,
+          payload.area as "low" | "medium" | "high",
+        ),
+      );
+    }
     return NextResponse.json(await buildMoveAreaTransaction(payload.player, payload.area as "low" | "medium" | "high"));
   } catch (error) {
     return NextResponse.json(

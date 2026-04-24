@@ -4,7 +4,17 @@ import idl from "../../../target/idl/escape_from_delta.json";
 const PROGRAM_ID = new anchor.web3.PublicKey(
   process.env.NEXT_PUBLIC_PROGRAM_ID ?? process.env.PROGRAM_ID ?? "7ueVgYfrwidjpwMCBfGyHCoVpaVNe7Ep1h2Mxv1ENBYQ",
 );
-const RPC_URL = process.env.ANCHOR_PROVIDER_URL ?? process.env.RPC_URL ?? "http://127.0.0.1:8899";
+const RPC_URL = process.env.ANCHOR_PROVIDER_URL ?? process.env.RPC_URL ?? "https://api.devnet.solana.com";
+
+type ProgramAccountNamespace = {
+  playerProfile: {
+    fetch(address: anchor.web3.PublicKey): Promise<any>;
+    fetchNullable(address: anchor.web3.PublicKey): Promise<any | null>;
+  };
+  raidSession: {
+    fetch(address: anchor.web3.PublicKey): Promise<any>;
+  };
+};
 
 export async function getLocalWalletAddress(): Promise<string> {
   return getProvider().wallet.publicKey.toBase58();
@@ -78,7 +88,7 @@ export async function ensureLocalDemoSetup(options: { includeServerPlayer?: bool
 
 export async function startLocalDemoRaid() {
   const { program, wallet, playerProfile, difficultyConfiguration } = await ensureLocalDemoSetup();
-  const player = await program.account.playerProfile.fetch(playerProfile);
+  const player = await accounts(program).playerProfile.fetch(playerProfile);
   const raidId = Number(player.nextRaidId.toString());
   const raidSession = deriveRaidSession(playerProfile, raidId);
 
@@ -117,7 +127,7 @@ export async function buildStartRaidTransaction(player: string) {
   const { provider, program, difficultyConfiguration } = await ensureLocalDemoSetup();
   const playerKey = new anchor.web3.PublicKey(player);
   const playerProfile = derivePlayerProfile(playerKey);
-  const playerAccount = await program.account.playerProfile.fetchNullable(playerProfile);
+  const playerAccount = await accounts(program).playerProfile.fetchNullable(playerProfile);
   if (!playerAccount) {
     throw new Error("missing-player-profile");
   }
@@ -136,17 +146,32 @@ export async function buildStartRaidTransaction(player: string) {
   return finalizeTransaction(provider.connection, transaction, playerKey);
 }
 
+export async function buildPurchaseLoadoutPointsTransaction(player: string, kind: "armor" | "weapon") {
+  const { provider, program, gameConfig } = await ensureLocalDemoSetup();
+  const playerKey = new anchor.web3.PublicKey(player);
+  const playerProfile = derivePlayerProfile(playerKey);
+  const transaction = await program.methods
+    .purchaseLoadoutPoints(kind === "armor" ? { armor: {} } : { weapon: {} })
+    .accounts({
+      gameConfig,
+      playerProfile,
+      player: playerKey,
+    })
+    .transaction();
+  return finalizeTransaction(provider.connection, transaction, playerKey);
+}
+
 export async function buildSettlementTransaction(player: string, result: "succeeded" | "failed") {
   const { provider, program } = await ensureLocalDemoSetup();
   const playerKey = new anchor.web3.PublicKey(player);
   const playerProfile = derivePlayerProfile(playerKey);
-  const playerAccount = await program.account.playerProfile.fetchNullable(playerProfile);
+  const playerAccount = await accounts(program).playerProfile.fetchNullable(playerProfile);
   if (!playerAccount?.activeRaid) {
     throw new Error("no-active-raid");
   }
 
   const raidSessionAddress = new anchor.web3.PublicKey(playerAccount.activeRaid);
-  const raidSession = await program.account.raidSession.fetch(raidSessionAddress);
+  const raidSession = await accounts(program).raidSession.fetch(raidSessionAddress);
   const battleRecord = deriveBattleRecord(playerProfile, Number(raidSession.raidId.toString()));
   const builder =
     result === "succeeded"
@@ -174,12 +199,36 @@ export async function buildOpenContainerTransaction(player: string, containerInd
   const transaction = await program.methods
     .openContainer(containerIndex, 0, 0, 0, new anchor.BN(finalRandomValue))
     .accounts({
-      player: playerKey,
+      signer: playerKey,
       playerProfile,
       raidSession: raidSessionAddress,
+      sessionToken: null,
     })
     .transaction();
   return finalizeTransaction(provider.connection, transaction, playerKey);
+}
+
+export async function buildSessionOpenContainerTransaction(
+  player: string,
+  sessionSigner: string,
+  sessionToken: string,
+  containerIndex = 0,
+  finalRandomValue = 5,
+) {
+  const { provider, program } = await ensureLocalDemoSetup();
+  const sessionSignerKey = new anchor.web3.PublicKey(sessionSigner);
+  const sessionTokenKey = new anchor.web3.PublicKey(sessionToken);
+  const { playerProfile, raidSessionAddress } = await getActiveRaid(program, player);
+  const transaction = await program.methods
+    .openContainer(containerIndex, 0, 0, 0, new anchor.BN(finalRandomValue))
+    .accounts({
+      signer: sessionSignerKey,
+      playerProfile,
+      raidSession: raidSessionAddress,
+      sessionToken: sessionTokenKey,
+    })
+    .transaction();
+  return finalizeTransaction(provider.connection, transaction, sessionSignerKey);
 }
 
 export async function buildFightEnemyTransaction(player: string, finalRandomValue = 7) {
@@ -194,12 +243,41 @@ export async function buildFightEnemyTransaction(player: string, finalRandomValu
       new anchor.BN(finalRandomValue),
     )
     .accounts({
-      player: playerKey,
+      signer: playerKey,
       playerProfile,
       raidSession: raidSessionAddress,
+      sessionToken: null,
     })
     .transaction();
   return finalizeTransaction(provider.connection, transaction, playerKey);
+}
+
+export async function buildSessionFightEnemyTransaction(
+  player: string,
+  sessionSigner: string,
+  sessionToken: string,
+  finalRandomValue = 7,
+) {
+  const { provider, program } = await ensureLocalDemoSetup();
+  const sessionSignerKey = new anchor.web3.PublicKey(sessionSigner);
+  const sessionTokenKey = new anchor.web3.PublicKey(sessionToken);
+  const { playerProfile, raidSessionAddress, raidSession } = await getActiveRaid(program, player);
+  const enemyCombatTenths = 30;
+  const transaction = await program.methods
+    .fightEnemy(
+      raidSession.currentArmorTenths,
+      raidSession.currentWeaponTenths,
+      enemyCombatTenths,
+      new anchor.BN(finalRandomValue),
+    )
+    .accounts({
+      signer: sessionSignerKey,
+      playerProfile,
+      raidSession: raidSessionAddress,
+      sessionToken: sessionTokenKey,
+    })
+    .transaction();
+  return finalizeTransaction(provider.connection, transaction, sessionSignerKey);
 }
 
 export async function buildMoveAreaTransaction(player: string, area: "low" | "medium" | "high") {
@@ -208,23 +286,46 @@ export async function buildMoveAreaTransaction(player: string, area: "low" | "me
   const transaction = await program.methods
     .moveArea(riskLevelArg(area))
     .accounts({
-      player: playerKey,
+      signer: playerKey,
       playerProfile,
       raidSession: raidSessionAddress,
+      sessionToken: null,
     })
     .transaction();
   return finalizeTransaction(provider.connection, transaction, playerKey);
 }
 
+export async function buildSessionMoveAreaTransaction(
+  player: string,
+  sessionSigner: string,
+  sessionToken: string,
+  area: "low" | "medium" | "high",
+) {
+  const { provider, program } = await ensureLocalDemoSetup();
+  const sessionSignerKey = new anchor.web3.PublicKey(sessionSigner);
+  const sessionTokenKey = new anchor.web3.PublicKey(sessionToken);
+  const { playerProfile, raidSessionAddress } = await getActiveRaid(program, player);
+  const transaction = await program.methods
+    .moveArea(riskLevelArg(area))
+    .accounts({
+      signer: sessionSignerKey,
+      playerProfile,
+      raidSession: raidSessionAddress,
+      sessionToken: sessionTokenKey,
+    })
+    .transaction();
+  return finalizeTransaction(provider.connection, transaction, sessionSignerKey);
+}
+
 export async function settleLocalDemoRaid(result: "succeeded" | "failed") {
   const { program, wallet, playerProfile } = await ensureLocalDemoSetup();
-  const player = await program.account.playerProfile.fetch(playerProfile);
+  const player = await accounts(program).playerProfile.fetch(playerProfile);
   if (!player.activeRaid) {
     throw new Error("no-active-raid");
   }
 
   const raidSessionAddress = new anchor.web3.PublicKey(player.activeRaid);
-  const raidSession = await program.account.raidSession.fetch(raidSessionAddress);
+  const raidSession = await accounts(program).raidSession.fetch(raidSessionAddress);
   const battleRecord = deriveBattleRecord(playerProfile, Number(raidSession.raidId.toString()));
 
   if (result === "succeeded") {
@@ -258,7 +359,9 @@ export async function settleLocalDemoRaid(result: "succeeded" | "failed") {
 
 function getProvider() {
   process.env.ANCHOR_PROVIDER_URL = RPC_URL;
-  process.env.ANCHOR_WALLET = process.env.ANCHOR_WALLET ?? `${process.env.HOME}/.config/solana/id.json`;
+  process.env.ANCHOR_WALLET =
+    process.env.ANCHOR_WALLET ??
+    `${process.env.HOME}/.config/solana/dev.json`;
   return anchor.AnchorProvider.local(RPC_URL, {
     commitment: "confirmed",
     preflightCommitment: "confirmed",
@@ -268,6 +371,10 @@ function getProvider() {
 function getProgram(provider: anchor.AnchorProvider) {
   anchor.setProvider(provider);
   return new anchor.Program(idl as anchor.Idl, provider);
+}
+
+function accounts(program: anchor.Program) {
+  return program.account as unknown as ProgramAccountNamespace;
 }
 
 async function finalizeTransaction(
@@ -289,13 +396,29 @@ async function finalizeTransaction(
 }
 
 async function sendServerTransaction(provider: anchor.AnchorProvider, transaction: anchor.web3.Transaction) {
+  const payer = provider.wallet.publicKey;
+  const balance = await provider.connection.getBalance(payer, "confirmed");
+  if (balance <= 0) {
+    throw new Error(
+      `server-wallet-insufficient-funds:${payer.toBase58()}. Fund this wallet on devnet or set ANCHOR_WALLET to a funded keypair.`,
+    );
+  }
+
   const { blockhash, lastValidBlockHeight } = await provider.connection.getLatestBlockhash("confirmed");
-  transaction.feePayer = provider.wallet.publicKey;
+  transaction.feePayer = payer;
   transaction.recentBlockhash = blockhash;
   const signedTransaction = await provider.wallet.signTransaction(transaction);
-  const signature = await provider.connection.sendRawTransaction(signedTransaction.serialize(), {
-    skipPreflight: false,
-  });
+  let signature: string;
+  try {
+    signature = await provider.connection.sendRawTransaction(signedTransaction.serialize(), {
+      skipPreflight: false,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `server-wallet-send-failed:${payer.toBase58()}: ${message}`,
+    );
+  }
   await waitForSignatureStatus(provider.connection, signature, lastValidBlockHeight);
   return signature;
 }
@@ -359,12 +482,12 @@ function deriveBattleRecord(playerProfile: anchor.web3.PublicKey, raidId: number
 async function getActiveRaid(program: anchor.Program, player: string) {
   const playerKey = new anchor.web3.PublicKey(player);
   const playerProfile = derivePlayerProfile(playerKey);
-  const playerAccount = await program.account.playerProfile.fetchNullable(playerProfile);
+  const playerAccount = await accounts(program).playerProfile.fetchNullable(playerProfile);
   if (!playerAccount?.activeRaid) {
     throw new Error("no-active-raid");
   }
   const raidSessionAddress = new anchor.web3.PublicKey(playerAccount.activeRaid);
-  const raidSession = await program.account.raidSession.fetch(raidSessionAddress);
+  const raidSession = await accounts(program).raidSession.fetch(raidSessionAddress);
   return { playerKey, playerProfile, raidSessionAddress, raidSession };
 }
 

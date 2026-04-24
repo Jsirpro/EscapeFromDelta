@@ -35,8 +35,11 @@ export function usePlayerProfile() {
       fetch(`/api/player/${wallet.walletAddress}`).then((response) => response.json()),
       fetch(`/api/records/${wallet.walletAddress}?limit=50`).then((response) => response.json()),
     ]);
-    setRemoteProfile(playerPayload.profile ? hydrateRemoteProfile(playerPayload.profile) : null);
-    setRemoteBattleRecords(recordPayload.records ?? []);
+    const nextProfile = playerPayload.profile ? hydrateRemoteProfile(playerPayload.profile) : null;
+    const nextRecords = recordPayload.records ?? [];
+    setRemoteProfile(nextProfile);
+    setRemoteBattleRecords(nextRecords);
+    return { profile: nextProfile, records: nextRecords };
   };
 
   useEffect(() => {
@@ -53,9 +56,21 @@ export function usePlayerProfile() {
     };
   }, [wallet.connected, wallet.walletAddress]);
 
+  async function refreshRemoteSafe() {
+    try {
+      return await refreshRemote();
+    } catch {
+      return null;
+    }
+  }
+
   return useMemo(
     () => ({
       ...wallet,
+      profile: remoteProfile ?? profile,
+      onChainProfile: remoteProfile,
+      onChainActiveRaid: remoteProfile?.activeRaid ?? null,
+      onChainProfileLoaded: remoteProfile !== null,
       conversionError,
       setConversionError,
       edcoinsBalance: (remoteProfile?.edcoinsBalance ?? profile?.edcoinsBalance) ?? 0n,
@@ -71,25 +86,29 @@ export function usePlayerProfile() {
           : 0,
       battleRecords: remoteBattleRecords ?? wallet.battleRecords,
       refreshRemote,
+      purchaseLoadoutPoints: async (kind: "armor" | "weapon") => {
+        await wallet.purchaseLoadoutPoints(kind);
+        return refreshRemoteSafe();
+      },
       startDemoRaid: async () => {
         await wallet.startDemoRaid();
-        await refreshRemote();
+        return refreshRemoteSafe();
       },
       openDemoContainer: async (containerIndex?: number, finalRandomValue?: number) => {
         await wallet.openDemoContainer(containerIndex, finalRandomValue);
-        await refreshRemote();
+        return refreshRemoteSafe();
       },
       fightDemoEnemy: async () => {
         await wallet.fightDemoEnemy();
-        await refreshRemote();
+        return refreshRemoteSafe();
       },
       moveDemoArea: async (area: "low" | "medium" | "high") => {
         await wallet.moveDemoArea(area);
-        await refreshRemote();
+        return refreshRemoteSafe();
       },
       settleDemoRaid: async (result: "succeeded" | "failed") => {
         await wallet.settleDemoRaid(result);
-        await refreshRemote();
+        return refreshRemoteSafe();
       },
       duplicateGrant: false,
     }),

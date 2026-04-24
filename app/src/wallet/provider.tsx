@@ -1,6 +1,8 @@
 "use client";
 
-import { Connection, Transaction } from "@solana/web3.js";
+import { useSessionKeyManager } from "@magicblock-labs/gum-react-sdk";
+import { Connection, PublicKey, Transaction, type SendOptions } from "@solana/web3.js";
+import bs58 from "bs58";
 import { createContext, type ReactNode, useContext, useMemo, useState } from "react";
 import { decodeBattleRecord } from "../../../clients/src/queries/battleRecords";
 import { decodePlayerProfile } from "../../../clients/src/queries/player";
@@ -8,7 +10,11 @@ import type { BattleRecord, PlayerProfile } from "../../../clients/src/types";
 
 const PROGRAM_ID =
   process.env.NEXT_PUBLIC_PROGRAM_ID ?? process.env.PROGRAM_ID ?? "7ueVgYfrwidjpwMCBfGyHCoVpaVNe7Ep1h2Mxv1ENBYQ";
-const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL ?? "http://127.0.0.1:8899";
+const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL ?? "https://api.devnet.solana.com";
+const SOLANA_CLUSTER =
+  (process.env.NEXT_PUBLIC_SOLANA_CLUSTER as "devnet" | "localnet" | undefined) ?? "devnet";
+const SESSION_TOP_UP_LAMPORTS = 10_000_000;
+const SESSION_EXPIRY_MINUTES = 10;
 
 interface AccountInfoLike {
   owner: string;
@@ -21,6 +27,7 @@ interface BrowserWalletProvider {
   connect(options?: { onlyIfTrusted?: boolean }): Promise<{ publicKey?: { toBase58(): string } }>;
   disconnect(): Promise<void>;
   signTransaction?: (transaction: Transaction) => Promise<Transaction>;
+  signAllTransactions?: (transactions: Transaction[]) => Promise<Transaction[]>;
   signAndSendTransaction?: (transaction: Transaction) => Promise<{ signature: string }>;
 }
 
@@ -28,7 +35,10 @@ interface WalletState {
   walletAddress: string | null;
   connected: boolean;
   connecting: boolean;
+  sessionPublicKey: string | null;
+  sessionToken: string | null;
   walletError: string | null;
+  lastTransactionDebug: Record<string, unknown> | null;
   connectDemoWallet: () => Promise<void>;
   disconnect: () => Promise<void>;
   profileAccount: AccountInfoLike | null;
@@ -36,6 +46,7 @@ interface WalletState {
   profile: PlayerProfile | null;
   battleRecords: BattleRecord[];
   convertDemoSol: (solAmount?: bigint) => void;
+  purchaseLoadoutPoints: (kind: "armor" | "weapon") => Promise<void>;
   startDemoRaid: () => Promise<void>;
   openDemoContainer: (containerIndex?: number, finalRandomValue?: number) => Promise<void>;
   fightDemoEnemy: () => Promise<void>;
@@ -68,7 +79,21 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [battleRecordAccounts] = useState<Record<string, AccountInfoLike[]>>({});
   const [walletProvider, setWalletProvider] = useState<BrowserWalletProvider | null>(null);
   const [walletError, setWalletError] = useState<string | null>(null);
+  const [lastTransactionDebug, setLastTransactionDebug] = useState<Record<string, unknown> | null>(null);
   const [connecting, setConnecting] = useState(false);
+  const connection = useMemo(() => new Connection(RPC_URL, "confirmed"), []);
+  const anchorWallet = useMemo(() => {
+    if (!walletAddress || !walletProvider?.signTransaction) return undefined;
+    const publicKey = new PublicKey(walletAddress);
+    return {
+      publicKey,
+      signTransaction: walletProvider.signTransaction.bind(walletProvider),
+      signAllTransactions:
+        walletProvider.signAllTransactions?.bind(walletProvider) ??
+        ((transactions: Transaction[]) => Promise.all(transactions.map((transaction) => walletProvider.signTransaction!(transaction)))),
+    };
+  }, [walletAddress, walletProvider]);
+  const sessionWallet = useSessionKeyManager(anchorWallet, connection, SOLANA_CLUSTER);
   const value = useMemo<WalletState>(() => {
     const profileAccount = walletAddress ? profileAccounts[walletAddress] ?? null : null;
     const recordAccounts = walletAddress ? battleRecordAccounts[walletAddress] ?? [] : [];
@@ -77,7 +102,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       walletAddress,
       connected: walletAddress !== null,
       connecting,
+      sessionPublicKey: sessionWallet.publicKey?.toBase58() ?? null,
+      sessionToken: sessionWallet.sessionToken,
       walletError,
+      lastTransactionDebug,
       connectDemoWallet: async () => {
         if (connecting) return;
         setConnecting(true);
@@ -100,6 +128,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
             browserWallet,
             {},
             { waitForConfirmation: false },
+            setLastTransactionDebug,
           );
           setWalletProvider(browserWallet);
           setWalletAddress(nextWallet);
@@ -149,38 +178,59 @@ export function WalletProvider({ children }: { children: ReactNode }) {
           };
         });
       },
+      purchaseLoadoutPoints: async (kind) => {
+        if (!walletAddress) throw new Error("wallet-not-connected");
+        if (!walletProvider) throw new Error("browser-wallet-missing");
+        await sendWalletTransactionWithError(
+          setWalletError,
+          setLastTransactionDebug,
+          "/api/tx/purchase-loadout",
+          walletAddress,
+          walletProvider,
+          { kind },
+        );
+      },
       startDemoRaid: async () => {
         if (!walletAddress) throw new Error("wallet-not-connected");
         if (!walletProvider) throw new Error("browser-wallet-missing");
-        await sendWalletTransactionWithError(setWalletError, "/api/tx/start", walletAddress, walletProvider);
+        await ensureSession(sessionWallet);
+        await sendWalletTransactionWithError(
+          setWalletError,
+          setLastTransactionDebug,
+          "/api/tx/start",
+          walletAddress,
+          walletProvider,
+        );
       },
       openDemoContainer: async (containerIndex = 0, finalRandomValue = 5) => {
         if (!walletAddress) throw new Error("wallet-not-connected");
-        if (!walletProvider) throw new Error("browser-wallet-missing");
-        await sendWalletTransactionWithError(setWalletError, "/api/tx/open", walletAddress, walletProvider, { containerIndex, finalRandomValue });
+        await sendSessionTransactionWithError(setWalletError, setLastTransactionDebug, sessionWallet, "/api/tx/open", walletAddress, {
+          containerIndex,
+          finalRandomValue,
+        });
       },
       fightDemoEnemy: async () => {
         if (!walletAddress) throw new Error("wallet-not-connected");
-        if (!walletProvider) throw new Error("browser-wallet-missing");
-        await sendWalletTransactionWithError(setWalletError, "/api/tx/fight", walletAddress, walletProvider);
+        await sendSessionTransactionWithError(setWalletError, setLastTransactionDebug, sessionWallet, "/api/tx/fight", walletAddress);
       },
       moveDemoArea: async (area) => {
         if (!walletAddress) throw new Error("wallet-not-connected");
-        if (!walletProvider) throw new Error("browser-wallet-missing");
-        await sendWalletTransactionWithError(setWalletError, "/api/tx/move", walletAddress, walletProvider, { area });
+        await sendSessionTransactionWithError(setWalletError, setLastTransactionDebug, sessionWallet, "/api/tx/move", walletAddress, { area });
       },
       settleDemoRaid: async (result) => {
         if (!walletAddress) throw new Error("wallet-not-connected");
         if (!walletProvider) throw new Error("browser-wallet-missing");
         await sendWalletTransactionWithError(
           setWalletError,
+          setLastTransactionDebug,
           result === "succeeded" ? "/api/tx/extract" : "/api/tx/fail",
           walletAddress,
           walletProvider,
         );
+        await sessionWallet.revokeSession?.();
       },
     };
-  }, [battleRecordAccounts, profileAccounts, walletAddress, walletProvider, walletError, connecting]);
+  }, [battleRecordAccounts, profileAccounts, walletAddress, walletProvider, walletError, lastTransactionDebug, connecting, sessionWallet]);
 
   return <WalletContext.Provider value={value}>{children}</WalletContext.Provider>;
 }
@@ -210,11 +260,13 @@ async function sendWalletTransaction(
   provider: BrowserWalletProvider,
   extraPayload: Record<string, unknown> = {},
   options: { waitForConfirmation?: boolean } = {},
+  setLastTransactionDebug?: (value: Record<string, unknown>) => void,
 ) {
+  const requestPayload = { player, ...extraPayload };
   const response = await fetch(path, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ player, ...extraPayload }),
+    body: JSON.stringify(requestPayload),
   });
   const payload = (await response.json()) as {
     serializedTransaction?: string;
@@ -222,6 +274,12 @@ async function sendWalletTransaction(
     lastValidBlockHeight?: number;
     error?: string;
   };
+  setLastTransactionDebug?.({
+    path,
+    request: requestPayload,
+    apiStatus: response.status,
+    apiResponse: payload,
+  });
   if (!response.ok || !payload.serializedTransaction) {
     throw new Error(payload.error ?? "transaction-build-failed");
   }
@@ -231,12 +289,33 @@ async function sendWalletTransaction(
 
   if (provider.signTransaction) {
     const signedTransaction = await provider.signTransaction(transaction);
-    const signature = await connection.sendRawTransaction(signedTransaction.serialize(), {
-      skipPreflight: false,
-    });
+    let signature: string;
+    try {
+      signature = await connection.sendRawTransaction(signedTransaction.serialize(), {
+        skipPreflight: true,
+      });
+    } catch (error) {
+      if (isAlreadyProcessedError(error)) {
+        const existingSignature = signedTransaction.signature;
+        if (!existingSignature) {
+          throw error;
+        }
+        signature = bs58.encode(existingSignature);
+      } else {
+        throw error;
+      }
+    }
     if (options.waitForConfirmation !== false) {
       await waitForSignatureStatus(connection, signature, payload.lastValidBlockHeight);
     }
+    setLastTransactionDebug?.({
+      path,
+      request: requestPayload,
+      apiStatus: response.status,
+      apiResponse: payload,
+      signature,
+      sentBy: "signTransaction",
+    });
     return { signature, lastValidBlockHeight: payload.lastValidBlockHeight };
   }
 
@@ -245,6 +324,14 @@ async function sendWalletTransaction(
     if (options.waitForConfirmation !== false) {
       await waitForSignatureStatus(connection, signature, payload.lastValidBlockHeight);
     }
+    setLastTransactionDebug?.({
+      path,
+      request: requestPayload,
+      apiStatus: response.status,
+      apiResponse: payload,
+      signature,
+      sentBy: "signAndSendTransaction",
+    });
     return { signature, lastValidBlockHeight: payload.lastValidBlockHeight };
   }
 
@@ -253,6 +340,7 @@ async function sendWalletTransaction(
 
 async function sendWalletTransactionWithError(
   setWalletError: (message: string | null) => void,
+  setLastTransactionDebug: (value: Record<string, unknown>) => void,
   path: string,
   player: string,
   provider: BrowserWalletProvider,
@@ -260,9 +348,114 @@ async function sendWalletTransactionWithError(
 ) {
   setWalletError(null);
   try {
-    return await sendWalletTransaction(path, player, provider, extraPayload);
+    return await sendWalletTransaction(path, player, provider, extraPayload, {}, setLastTransactionDebug);
   } catch (error) {
     const message = error instanceof Error ? error.message : "wallet-transaction-failed";
+    setLastTransactionDebug({
+      path,
+      request: { player, ...extraPayload },
+      frontendError: serializeError(error),
+    });
+    setWalletError(message);
+    throw error;
+  }
+}
+
+async function ensureSession(sessionWallet: {
+  publicKey: PublicKey | null;
+  sessionToken: string | null;
+  createSession?: (
+    targetProgram: PublicKey,
+    topUpLamports?: number,
+    validUntil?: number,
+  ) => Promise<unknown>;
+}) {
+  if (sessionWallet.publicKey && sessionWallet.sessionToken) {
+    return;
+  }
+  if (!sessionWallet.createSession) {
+    throw new Error("session-create-not-supported");
+  }
+  await sessionWallet.createSession(new PublicKey(PROGRAM_ID), SESSION_TOP_UP_LAMPORTS, SESSION_EXPIRY_MINUTES);
+}
+
+async function sendSessionTransactionWithError(
+  setWalletError: (message: string | null) => void,
+  setLastTransactionDebug: (value: Record<string, unknown>) => void,
+  sessionWallet: {
+    publicKey: PublicKey | null;
+    sessionToken: string | null;
+    signAndSendTransaction?: (
+      transaction: Transaction | Transaction[],
+      connection?: Connection,
+      options?: SendOptions,
+    ) => Promise<string[]>;
+  },
+  path: string,
+  player: string,
+  extraPayload: Record<string, unknown> = {},
+) {
+  setWalletError(null);
+  try {
+    if (!sessionWallet.publicKey || !sessionWallet.sessionToken || !sessionWallet.signAndSendTransaction) {
+      throw new Error("session-wallet-missing");
+    }
+    const response = await fetch(path, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        player,
+        sessionSigner: sessionWallet.publicKey.toBase58(),
+        sessionToken: sessionWallet.sessionToken,
+        ...extraPayload,
+      }),
+    });
+    const payload = (await response.json()) as {
+      serializedTransaction?: string;
+      error?: string;
+    };
+    setLastTransactionDebug({
+      path,
+      request: {
+        player,
+        sessionSigner: sessionWallet.publicKey.toBase58(),
+        sessionToken: sessionWallet.sessionToken,
+        ...extraPayload,
+      },
+      apiStatus: response.status,
+      apiResponse: payload,
+    });
+    if (!response.ok || !payload.serializedTransaction) {
+      throw new Error(payload.error ?? "session-transaction-build-failed");
+    }
+    const transaction = Transaction.from(decodeBase64(payload.serializedTransaction));
+    const signatures = await sessionWallet.signAndSendTransaction(transaction, new Connection(RPC_URL, "confirmed"), {
+      skipPreflight: true,
+    });
+    if (!signatures.length) {
+      throw new Error("session-transaction-failed");
+    }
+    setLastTransactionDebug({
+      path,
+      request: {
+        player,
+        sessionSigner: sessionWallet.publicKey.toBase58(),
+        sessionToken: sessionWallet.sessionToken,
+        ...extraPayload,
+      },
+      apiStatus: response.status,
+      apiResponse: payload,
+      signature: signatures[0],
+      sentBy: "sessionWallet",
+    });
+    return signatures[0];
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "session-transaction-failed";
+    setLastTransactionDebug({
+      path,
+      request: { player, ...extraPayload },
+      frontendError: serializeError(error),
+    });
     setWalletError(message);
     throw error;
   }
@@ -311,4 +504,20 @@ function withTimeout<T>(promise: Promise<T>, message: string, ms = 3_000): Promi
       window.setTimeout(() => reject(new Error(message)), ms);
     }),
   ]);
+}
+
+function isAlreadyProcessedError(error: unknown) {
+  if (!(error instanceof Error)) return false;
+  return error.message.includes("already been processed");
+}
+
+function serializeError(error: unknown) {
+  if (error instanceof Error) {
+    return {
+      name: error.name,
+      message: error.message,
+      stack: error.stack ?? null,
+    };
+  }
+  return { value: String(error) };
 }

@@ -106,6 +106,13 @@ pub mod escape_from_delta {
         instructions::purchase_listing::handler(ctx)
     }
 
+    pub fn purchase_loadout_points(
+        ctx: Context<PurchaseLoadoutPoints>,
+        kind: LoadoutPointKind,
+    ) -> Result<()> {
+        instructions::purchase_loadout_points::handler(ctx, kind)
+    }
+
     pub fn cancel_listing(ctx: Context<CancelListing>) -> Result<()> {
         instructions::cancel_listing::handler(ctx)
     }

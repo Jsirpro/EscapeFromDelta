@@ -44,6 +44,8 @@ pub fn handler(ctx: Context<SettleFailedRaid>) -> Result<(u16, u16)> {
     let timed_out = crate::instructions::is_timed_out(raid_session.started_at, now);
     require!(
         timed_out
+            || raid_session.status == RaidStatus::Active
+            || raid_session.status == RaidStatus::PendingBattle
             || raid_session.status == RaidStatus::Failed
             || raid_session.status == RaidStatus::TimedOut,
         EscapeError::InvalidRaidState
