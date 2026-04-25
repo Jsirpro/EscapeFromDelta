@@ -21,6 +21,8 @@ interface RemotePlayerProfilePayload {
 interface RemoteRaidPayload {
   status: "preparing" | "active" | "pending_battle" | "extracting" | "succeeded" | "failed" | "timed_out";
   currentArea: "low" | "medium" | "high";
+  safeCaseCapacity: number;
+  safeCaseItems: string[];
   lootItems: Array<{
     assetId: string;
     rarity: "rare" | "epic" | "legendary";
@@ -99,6 +101,8 @@ export function usePlayerProfile() {
       onChainActiveRaid: remoteProfile?.activeRaid ?? null,
       onChainRaidStatus: remoteRaid?.status ?? null,
       onChainRaidArea: remoteRaid?.currentArea ?? null,
+      onChainSafeCaseCapacity: remoteRaid?.safeCaseCapacity ?? 0,
+      onChainSafeCaseItems: remoteRaid?.safeCaseItems ?? [],
       onChainLootItems: remoteRaid?.lootItems ?? [],
       onChainProfileLoaded: remoteLoaded,
       conversionError,
@@ -124,8 +128,8 @@ export function usePlayerProfile() {
         await wallet.purchaseLoadoutPoints(kind, amountTenths);
         return refreshRemoteSafe();
       },
-      startDemoRaid: async () => {
-        await wallet.startDemoRaid();
+      startDemoRaid: async (safeCaseCapacity = 0) => {
+        await wallet.startDemoRaid(safeCaseCapacity);
         return refreshRemoteSafe();
       },
       openDemoContainer: async (containerIndex?: number, finalRandomValue?: number) => {

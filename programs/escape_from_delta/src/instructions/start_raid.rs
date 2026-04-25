@@ -5,7 +5,8 @@ use crate::state::validation::{checked_sub_u64, require_armor_range, require_wea
 use crate::state::{
     PlayerProfile, RaidSession, RaidStatus, RiskAreaRuntime, RiskLevel,
     DEFAULT_CONTAINERS_PER_AREA, DEFAULT_HIGH_ENCOUNTER_PERCENT, DEFAULT_LOW_ENCOUNTER_PERCENT,
-    DEFAULT_MID_ENCOUNTER_PERCENT, SCHEMA_VERSION, SEED_PLAYER, SEED_RAID,
+    DEFAULT_MID_ENCOUNTER_PERCENT, MAX_SAFE_CASE_CAPACITY, SAFE_CASE_SLOT_PRICE_EDCOINS,
+    SCHEMA_VERSION, SEED_PLAYER, SEED_RAID,
 };
 
 #[derive(Accounts)]
@@ -38,17 +39,28 @@ pub fn handler(
     armor_tenths: u16,
     weapon_tenths: u16,
     entry_fee: u64,
+    safe_case_capacity: u8,
 ) -> Result<()> {
     require!(entry_fee > 0, EscapeError::InsufficientFunds);
     require_armor_range(armor_tenths)?;
     require_weapon_range(weapon_tenths)?;
+    require!(
+        safe_case_capacity <= MAX_SAFE_CASE_CAPACITY,
+        EscapeError::InvalidSafeCaseSelection
+    );
     let player_profile = &mut ctx.accounts.player_profile;
+    let safe_case_fee = u64::from(safe_case_capacity)
+        .checked_mul(SAFE_CASE_SLOT_PRICE_EDCOINS)
+        .ok_or(EscapeError::ArithmeticOverflow)?;
+    let total_entry_fee = entry_fee
+        .checked_add(safe_case_fee)
+        .ok_or(EscapeError::ArithmeticOverflow)?;
     require!(player_profile.active_raid.is_none(), EscapeError::RaidAlreadyActive);
-    require!(player_profile.edcoins_balance >= entry_fee, EscapeError::InsufficientFunds);
+    require!(player_profile.edcoins_balance >= total_entry_fee, EscapeError::InsufficientFunds);
     require!(player_profile.armor_point_balance >= armor_tenths, EscapeError::InvalidEquipment);
     require!(player_profile.weapon_point_balance >= weapon_tenths, EscapeError::InvalidEquipment);
 
-    player_profile.edcoins_balance = checked_sub_u64(player_profile.edcoins_balance, entry_fee)?;
+    player_profile.edcoins_balance = checked_sub_u64(player_profile.edcoins_balance, total_entry_fee)?;
     player_profile.armor_point_balance = player_profile
         .armor_point_balance
         .checked_sub(armor_tenths)
@@ -96,9 +108,9 @@ pub fn handler(
     raid_session.locked_difficulty = ctx.accounts.difficulty_configuration.key();
     raid_session.locked_difficulty_id = 0;
     raid_session.locked_difficulty_version = 1;
-    raid_session.entry_fee_paid = entry_fee;
+    raid_session.entry_fee_paid = total_entry_fee;
     raid_session.selected_safe_case = None;
-    raid_session.safe_case_capacity = 0;
+    raid_session.safe_case_capacity = safe_case_capacity;
     raid_session.safe_case_selection = Vec::new();
     raid_session.armor_asset = Pubkey::default();
     raid_session.weapon_asset = Pubkey::default();

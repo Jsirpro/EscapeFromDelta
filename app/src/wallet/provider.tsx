@@ -47,7 +47,7 @@ interface WalletState {
   battleRecords: BattleRecord[];
   convertDemoSol: (solAmount?: bigint) => Promise<void>;
   purchaseLoadoutPoints: (kind: "armor" | "weapon", amountTenths?: number) => Promise<void>;
-  startDemoRaid: () => Promise<void>;
+  startDemoRaid: (safeCaseCapacity?: number) => Promise<void>;
   openDemoContainer: (containerIndex?: number, finalRandomValue?: number) => Promise<void>;
   fightDemoEnemy: () => Promise<void>;
   moveDemoArea: (area: "low" | "medium" | "high") => Promise<void>;
@@ -194,10 +194,24 @@ export function WalletProvider({ children }: { children: ReactNode }) {
           { kind, amountTenths },
         );
       },
-      startDemoRaid: async () => {
+      startDemoRaid: async (safeCaseCapacity = 0) => {
         if (!walletAddress) throw new Error("wallet-not-connected");
         if (!walletProvider) throw new Error("browser-wallet-missing");
-        const ensuredSession = await ensureSession(sessionWallet);
+        let ensuredSession: SessionCredentials;
+        try {
+          ensuredSession = await ensureSession(sessionWallet);
+          setLastTransactionDebug({
+            path: "session/create",
+            sessionPublicKey: ensuredSession.publicKey.toBase58(),
+            sessionToken: ensuredSession.sessionToken,
+          });
+        } catch (error) {
+          setLastTransactionDebug({
+            path: "session/create",
+            frontendError: serializeError(error),
+          });
+          throw error;
+        }
         setLocalSessionCredentials(ensuredSession);
         await sendWalletTransactionWithError(
           setWalletError,
@@ -205,6 +219,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
           "/api/tx/start",
           walletAddress,
           walletProvider,
+          { safeCaseCapacity },
         );
       },
       openDemoContainer: async (containerIndex = 0, finalRandomValue = 5) => {
@@ -538,6 +553,9 @@ function extractSessionCredentials(value: unknown): SessionCredentials | null {
     return null;
   }
   const record = value as Record<string, unknown>;
+  if (typeof record.error === "string" && record.error.length > 0) {
+    throw new Error(record.error);
+  }
   const publicKey =
     normalizePublicKey(record.publicKey) ??
     normalizePublicKey(record.sessionPublicKey) ??

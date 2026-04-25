@@ -6,6 +6,7 @@ const PROGRAM_ID = new anchor.web3.PublicKey(
 );
 const RPC_URL = process.env.ANCHOR_PROVIDER_URL ?? process.env.RPC_URL ?? "https://api.devnet.solana.com";
 const LAMPORTS_PER_SOL = 1_000_000_000;
+const DEFAULT_SAFE_CASE_CAPACITY = 0;
 
 type ProgramAccountNamespace = {
   playerProfile: {
@@ -94,7 +95,7 @@ export async function startLocalDemoRaid() {
   const raidSession = deriveRaidSession(playerProfile, raidId);
 
   const transaction = await program.methods
-    .startRaid(20, 20, new anchor.BN(1000))
+    .startRaid(20, 20, new anchor.BN(1000), DEFAULT_SAFE_CASE_CAPACITY)
     .accounts({
       player: wallet,
       playerProfile,
@@ -124,7 +125,7 @@ export async function buildCreateOrConnectPlayerTransaction(player: string) {
   return finalizeTransaction(provider.connection, transaction, playerKey);
 }
 
-export async function buildStartRaidTransaction(player: string) {
+export async function buildStartRaidTransaction(player: string, safeCaseCapacity = DEFAULT_SAFE_CASE_CAPACITY) {
   const { provider, program, difficultyConfiguration } = await ensureLocalDemoSetup();
   const playerKey = new anchor.web3.PublicKey(player);
   const playerProfile = derivePlayerProfile(playerKey);
@@ -135,7 +136,7 @@ export async function buildStartRaidTransaction(player: string) {
   const raidId = Number(playerAccount.nextRaidId.toString());
   const raidSession = deriveRaidSession(playerProfile, raidId);
   const transaction = await program.methods
-    .startRaid(20, 20, new anchor.BN(1000))
+    .startRaid(20, 20, new anchor.BN(1000), safeCaseCapacity)
     .accounts({
       player: playerKey,
       playerProfile,

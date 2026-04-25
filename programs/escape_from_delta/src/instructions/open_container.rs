@@ -98,6 +98,14 @@ pub fn handler(
     let loot_event_id = raid_session.random_events.len() as u64 + 1;
     let loot_pubkey = synthetic_loot_key(raid_id, loot_event_id);
     raid_session.carried_loot.push(loot_pubkey);
+    if raid_session.safe_case_capacity > 0 {
+        raid_session.safe_case_selection = raid_session
+            .carried_loot
+            .iter()
+            .copied()
+            .take(usize::from(raid_session.safe_case_capacity))
+            .collect();
+    }
     raid_session.random_events.push(RandomEventAudit::new(
         loot_event_id,
         RandomEventType::LootDrop,

@@ -28,6 +28,8 @@ interface DecodedRaidSessionAccount {
   raid: {
     status: RaidStatus;
     currentArea: RiskLevel;
+    safeCaseCapacity: number;
+    safeCaseItems: string[];
     lootItems: LootDisplayItem[];
   };
 }
@@ -314,10 +316,11 @@ function decodeRaidSessionAccount(base64: string): DecodedRaidSessionAccount["ra
   const _lockedDifficultyVersion = reader.readU32();
   const _entryFeePaid = reader.readU64();
   const _selectedSafeCase = reader.readOptionalPubkey();
-  const _safeCaseCapacity = reader.readU8();
+  const safeCaseCapacity = reader.readU8();
   const safeCaseSelectionLength = reader.readU32();
+  const safeCaseItems: string[] = [];
   for (let index = 0; index < safeCaseSelectionLength; index += 1) {
-    reader.readPubkey();
+    safeCaseItems.push(reader.readPubkey());
   }
   const _armorAsset = reader.readPubkey();
   const _weaponAsset = reader.readPubkey();
@@ -337,6 +340,8 @@ function decodeRaidSessionAccount(base64: string): DecodedRaidSessionAccount["ra
   return {
     status,
     currentArea,
+    safeCaseCapacity,
+    safeCaseItems,
     lootItems: carriedLoot.map(deriveCollectibleDisplay),
   };
 }

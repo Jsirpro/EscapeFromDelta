@@ -21,16 +21,25 @@ export default function PlayPage() {
   const [busyAction, setBusyAction] = useState<null | "start" | "open" | "move" | "fight" | "extract" | "abandon" | "buy-armor" | "buy-weapon">(null);
   const [hasLocalActiveRaid, setHasLocalActiveRaid] = useState(false);
   const [forceReadyMode, setForceReadyMode] = useState(true);
+  const [safeCaseCapacity, setSafeCaseCapacity] = useState(0);
   const [armorPurchaseAmount, setArmorPurchaseAmount] = useState("1.0");
   const [weaponPurchaseAmount, setWeaponPurchaseAmount] = useState("1.0");
   const hasActiveRaid = !forceReadyMode && (hasLocalActiveRaid || Boolean(player.onChainActiveRaid));
   const showResumePrompt = hasActiveRaid && (state.status === "preparing" || state.status === "transitioning");
   const startArmorCost = 2.0;
   const startWeaponCost = 2.0;
+  const safeCaseUnitPrice = 500;
+  const safeCasePrice = safeCaseCapacity * safeCaseUnitPrice;
+  const totalStartEdcoinsCost = 1000 + safeCasePrice;
   const armorPurchasePrice = purchasePriceValue(armorPurchaseAmount);
   const weaponPurchasePrice = purchasePriceValue(weaponPurchaseAmount);
   const armorPurchaseDisabled = busyAction !== null || armorPurchasePrice <= 0 || BigInt(armorPurchasePrice) > player.edcoinsBalance;
   const weaponPurchaseDisabled = busyAction !== null || weaponPurchasePrice <= 0 || BigInt(weaponPurchasePrice) > player.edcoinsBalance;
+  const startRaidDisabled =
+    busyAction !== null ||
+    player.armorPointBalance < startArmorCost ||
+    player.weaponPointBalance < startWeaponCost ||
+    BigInt(totalStartEdcoinsCost) > player.edcoinsBalance;
 
   const raidStatusLabel = useMemo(() => {
     if (busyAction === "start") return t.play.deploying;
@@ -52,6 +61,7 @@ export default function PlayPage() {
     setBusyAction(null);
     setHasLocalActiveRaid(false);
     setForceReadyMode(true);
+    setSafeCaseCapacity(0);
     dispatch({ type: "reset" });
   }, [player.walletAddress]);
 
@@ -173,7 +183,7 @@ export default function PlayPage() {
     setBusyAction("start");
     dispatch({ type: "start" });
     try {
-      await player.startDemoRaid();
+      await player.startDemoRaid(safeCaseCapacity);
       setForceReadyMode(false);
       setHasLocalActiveRaid(true);
       dispatch({ type: "landed" });
@@ -296,6 +306,10 @@ export default function PlayPage() {
               <p>
                 {t.common.weapon}: {startWeaponCost.toFixed(1)}
               </p>
+              <p>
+                {t.play.safeCase}: {safeCaseCapacity === 0 ? t.play.safeCaseNone : `${safeCaseCapacity} ${t.play.safeCaseSlot}`} ({safeCasePrice} EDcoins)
+              </p>
+              <p>{t.common.edcoins}: {totalStartEdcoinsCost}</p>
             </div>
           </div>
 
@@ -421,7 +435,7 @@ export default function PlayPage() {
               <>
                 <button
                   className="button"
-                  disabled={busyAction !== null}
+                  disabled={startRaidDisabled}
                   type="button"
                   onClick={handleStartRaid}
                 >
@@ -536,7 +550,14 @@ export default function PlayPage() {
         </div>
         <div>
           <RaidActionPanel state={state} />
-          <SafeCaseSelection />
+          <SafeCaseSelection
+            activeCapacity={player.onChainSafeCaseCapacity}
+            activeSelectedCount={player.onChainSafeCaseItems.length}
+            capacity={safeCaseCapacity}
+            disabled={busyAction !== null || hasActiveRaid}
+            priceEdcoins={safeCasePrice}
+            onChange={setSafeCaseCapacity}
+          />
           {state.status === "succeeded" ? <RaidResult result="succeeded" /> : null}
           {state.status === "failed" ? <RaidResult result="failed" /> : null}
         </div>

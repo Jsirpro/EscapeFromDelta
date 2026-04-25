@@ -46,8 +46,15 @@ pub mod escape_from_delta {
         armor_tenths: u16,
         weapon_tenths: u16,
         entry_fee: u64,
+        safe_case_capacity: u8,
     ) -> Result<()> {
-        instructions::start_raid::handler(ctx, armor_tenths, weapon_tenths, entry_fee)
+        instructions::start_raid::handler(
+            ctx,
+            armor_tenths,
+            weapon_tenths,
+            entry_fee,
+            safe_case_capacity,
+        )
     }
 
     pub fn select_safe_case_items(
