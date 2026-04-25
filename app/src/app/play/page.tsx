@@ -174,16 +174,10 @@ export default function PlayPage() {
     dispatch({ type: "start" });
     try {
       await player.startDemoRaid();
-      const activeRaidReady = await waitForActiveRaid(player.refreshRemote);
-      if (!activeRaidReady) {
-        const fallbackSnapshot = await player.refreshRemote().catch(() => null);
-        if (!fallbackSnapshot?.profile?.activeRaid && !player.onChainActiveRaid) {
-          throw new Error("raid-not-ready");
-        }
-      }
       setForceReadyMode(false);
       setHasLocalActiveRaid(true);
       dispatch({ type: "landed" });
+      void waitForActiveRaid(player.refreshRemote).catch(() => undefined);
     } catch (error) {
       const snapshot = await player.refreshRemote().catch(() => null);
       dispatch({ type: "reset" });
@@ -567,6 +561,9 @@ function formatPlayError(error: string, t: ReturnType<typeof useI18n>["t"]) {
   }
   if (error.includes('"Custom":6009') || error.includes("InvalidEquipment")) {
     return t.play.insufficientLoadout;
+  }
+  if (error.includes("session-wallet-missing") || error.includes("session-create-not-supported")) {
+    return t.play.sessionRequired;
   }
   return error;
 }

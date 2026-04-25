@@ -28,12 +28,14 @@ interface DecodedRaidSessionAccount {
   raid: {
     status: RaidStatus;
     currentArea: RiskLevel;
-    lootItems: Array<{
-      assetId: string;
-      rarity: "rare" | "epic" | "legendary";
-      label: string;
-    }>;
+    lootItems: LootDisplayItem[];
   };
+}
+
+export interface LootDisplayItem {
+  assetId: string;
+  rarity: "rare" | "epic" | "legendary";
+  label: string;
 }
 
 class ByteReader {
@@ -339,7 +341,7 @@ function decodeRaidSessionAccount(base64: string): DecodedRaidSessionAccount["ra
   };
 }
 
-function deriveCollectibleDisplay(assetId: string): DecodedRaidSessionAccount["raid"]["lootItems"][number] {
+export function deriveCollectibleDisplay(assetId: string): LootDisplayItem {
   const bytes = decodeBase58(assetId);
   const rarityRoll = ((bytes[0] ?? 0) + (bytes[7] ?? 0) + (bytes[13] ?? 0)) % 100;
   const rarity = rarityRoll < 8 ? "legendary" : rarityRoll < 30 ? "epic" : "rare";

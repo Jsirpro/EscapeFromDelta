@@ -56,6 +56,11 @@ interface WalletState {
 
 const WalletContext = createContext<WalletState | null>(null);
 
+interface SessionCredentials {
+  publicKey: PublicKey;
+  sessionToken: string;
+}
+
 function createPlayerAccount(walletAddress: string): AccountInfoLike {
   return {
     owner: PROGRAM_ID,
@@ -81,6 +86,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
   const [walletError, setWalletError] = useState<string | null>(null);
   const [lastTransactionDebug, setLastTransactionDebug] = useState<Record<string, unknown> | null>(null);
   const [connecting, setConnecting] = useState(false);
+  const [localSessionCredentials, setLocalSessionCredentials] = useState<SessionCredentials | null>(null);
   const connection = useMemo(() => new Connection(RPC_URL, "confirmed"), []);
   const anchorWallet = useMemo(() => {
     if (!walletAddress || !walletProvider?.signTransaction) return undefined;
@@ -102,8 +108,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       walletAddress,
       connected: walletAddress !== null,
       connecting,
-      sessionPublicKey: sessionWallet.publicKey?.toBase58() ?? null,
-      sessionToken: sessionWallet.sessionToken,
+      sessionPublicKey: localSessionCredentials?.publicKey.toBase58() ?? sessionWallet.publicKey?.toBase58() ?? null,
+      sessionToken: localSessionCredentials?.sessionToken ?? sessionWallet.sessionToken,
       walletError,
       lastTransactionDebug,
       connectDemoWallet: async () => {
@@ -132,6 +138,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
           );
           setWalletProvider(browserWallet);
           setWalletAddress(nextWallet);
+          setLocalSessionCredentials(null);
 
           const connection = new Connection(RPC_URL, "confirmed");
           void waitForSignatureStatus(connection, connectResult.signature, connectResult.lastValidBlockHeight)
@@ -154,6 +161,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         if (walletProvider) {
           await walletProvider.disconnect();
         }
+        setLocalSessionCredentials(null);
         setWalletProvider(null);
         setWalletAddress(null);
       },
@@ -189,7 +197,8 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       startDemoRaid: async () => {
         if (!walletAddress) throw new Error("wallet-not-connected");
         if (!walletProvider) throw new Error("browser-wallet-missing");
-        await ensureSession(sessionWallet);
+        const ensuredSession = await ensureSession(sessionWallet);
+        setLocalSessionCredentials(ensuredSession);
         await sendWalletTransactionWithError(
           setWalletError,
           setLastTransactionDebug,
@@ -200,50 +209,50 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       },
       openDemoContainer: async (containerIndex = 0, finalRandomValue = 5) => {
         if (!walletAddress) throw new Error("wallet-not-connected");
-        if (walletProvider && (!sessionWallet.publicKey || !sessionWallet.sessionToken || !sessionWallet.signAndSendTransaction)) {
-          await sendWalletTransactionWithError(
-            setWalletError,
-            setLastTransactionDebug,
-            "/api/tx/open",
-            walletAddress,
-            walletProvider,
-            { containerIndex, finalRandomValue },
-          );
-          return;
-        }
-        await sendSessionTransactionWithError(setWalletError, setLastTransactionDebug, sessionWallet, "/api/tx/open", walletAddress, {
+        await sendSessionTransactionWithError(
+          setWalletError,
+          setLastTransactionDebug,
+          {
+            publicKey: localSessionCredentials?.publicKey ?? sessionWallet.publicKey,
+            sessionToken: localSessionCredentials?.sessionToken ?? sessionWallet.sessionToken,
+            signAndSendTransaction: sessionWallet.signAndSendTransaction,
+          },
+          "/api/tx/open",
+          walletAddress,
+          {
           containerIndex,
           finalRandomValue,
-        });
+          },
+        );
       },
       fightDemoEnemy: async () => {
         if (!walletAddress) throw new Error("wallet-not-connected");
-        if (walletProvider && (!sessionWallet.publicKey || !sessionWallet.sessionToken || !sessionWallet.signAndSendTransaction)) {
-          await sendWalletTransactionWithError(
-            setWalletError,
-            setLastTransactionDebug,
-            "/api/tx/fight",
-            walletAddress,
-            walletProvider,
-          );
-          return;
-        }
-        await sendSessionTransactionWithError(setWalletError, setLastTransactionDebug, sessionWallet, "/api/tx/fight", walletAddress);
+        await sendSessionTransactionWithError(
+          setWalletError,
+          setLastTransactionDebug,
+          {
+            publicKey: localSessionCredentials?.publicKey ?? sessionWallet.publicKey,
+            sessionToken: localSessionCredentials?.sessionToken ?? sessionWallet.sessionToken,
+            signAndSendTransaction: sessionWallet.signAndSendTransaction,
+          },
+          "/api/tx/fight",
+          walletAddress,
+        );
       },
       moveDemoArea: async (area) => {
         if (!walletAddress) throw new Error("wallet-not-connected");
-        if (walletProvider && (!sessionWallet.publicKey || !sessionWallet.sessionToken || !sessionWallet.signAndSendTransaction)) {
-          await sendWalletTransactionWithError(
-            setWalletError,
-            setLastTransactionDebug,
-            "/api/tx/move",
-            walletAddress,
-            walletProvider,
-            { area },
-          );
-          return;
-        }
-        await sendSessionTransactionWithError(setWalletError, setLastTransactionDebug, sessionWallet, "/api/tx/move", walletAddress, { area });
+        await sendSessionTransactionWithError(
+          setWalletError,
+          setLastTransactionDebug,
+          {
+            publicKey: localSessionCredentials?.publicKey ?? sessionWallet.publicKey,
+            sessionToken: localSessionCredentials?.sessionToken ?? sessionWallet.sessionToken,
+            signAndSendTransaction: sessionWallet.signAndSendTransaction,
+          },
+          "/api/tx/move",
+          walletAddress,
+          { area },
+        );
       },
       settleDemoRaid: async (result, raidSessionAddress) => {
         if (!walletAddress) throw new Error("wallet-not-connected");
@@ -257,9 +266,10 @@ export function WalletProvider({ children }: { children: ReactNode }) {
           raidSessionAddress ? { raidSession: raidSessionAddress } : {},
         );
         await sessionWallet.revokeSession?.();
+        setLocalSessionCredentials(null);
       },
     };
-  }, [battleRecordAccounts, profileAccounts, walletAddress, walletProvider, walletError, lastTransactionDebug, connecting, sessionWallet]);
+  }, [battleRecordAccounts, profileAccounts, walletAddress, walletProvider, walletError, lastTransactionDebug, connecting, sessionWallet, localSessionCredentials]);
 
   return <WalletContext.Provider value={value}>{children}</WalletContext.Provider>;
 }
@@ -397,19 +407,32 @@ async function sendWalletTransactionWithError(
 async function ensureSession(sessionWallet: {
   publicKey: PublicKey | null;
   sessionToken: string | null;
+  getSessionToken?: () => Promise<unknown>;
   createSession?: (
     targetProgram: PublicKey,
     topUpLamports?: number,
     validUntil?: number,
   ) => Promise<unknown>;
-}) {
-  if (sessionWallet.publicKey && sessionWallet.sessionToken) {
-    return;
+}): Promise<SessionCredentials> {
+  const existingCredentials = resolveSessionCredentials(sessionWallet.publicKey, sessionWallet.sessionToken);
+  if (existingCredentials) {
+    return existingCredentials;
   }
   if (!sessionWallet.createSession) {
     throw new Error("session-create-not-supported");
   }
-  await sessionWallet.createSession(new PublicKey(PROGRAM_ID), SESSION_TOP_UP_LAMPORTS, SESSION_EXPIRY_MINUTES);
+  const createdSession = await sessionWallet.createSession(
+    new PublicKey(PROGRAM_ID),
+    SESSION_TOP_UP_LAMPORTS,
+    SESSION_EXPIRY_MINUTES,
+  );
+  const nextCredentials =
+    extractSessionCredentials(createdSession) ??
+    (await pollSessionCredentials(sessionWallet));
+  if (!nextCredentials) {
+    throw new Error("session-wallet-missing");
+  }
+  return nextCredentials;
 }
 
 async function sendSessionTransactionWithError(
@@ -446,6 +469,7 @@ async function sendSessionTransactionWithError(
     const payload = (await response.json()) as {
       serializedTransaction?: string;
       error?: string;
+      lastValidBlockHeight?: number;
     };
     setLastTransactionDebug({
       path,
@@ -468,6 +492,7 @@ async function sendSessionTransactionWithError(
     if (!signatures.length) {
       throw new Error("session-transaction-failed");
     }
+    await waitForSignatureStatus(new Connection(RPC_URL, "confirmed"), signatures[0], payload.lastValidBlockHeight);
     setLastTransactionDebug({
       path,
       request: {
@@ -499,6 +524,93 @@ function decodeBase64(value: string): Uint8Array {
     return Uint8Array.from(Buffer.from(value, "base64"));
   }
   return Uint8Array.from(window.atob(value), (character) => character.charCodeAt(0));
+}
+
+function resolveSessionCredentials(publicKey: PublicKey | null, sessionToken: string | null): SessionCredentials | null {
+  if (!publicKey || !sessionToken) {
+    return null;
+  }
+  return { publicKey, sessionToken };
+}
+
+function extractSessionCredentials(value: unknown): SessionCredentials | null {
+  if (!value || typeof value !== "object") {
+    return null;
+  }
+  const record = value as Record<string, unknown>;
+  const publicKey =
+    normalizePublicKey(record.publicKey) ??
+    normalizePublicKey(record.sessionPublicKey) ??
+    normalizePublicKey(record.signer);
+  const sessionToken =
+    normalizePublicKey(record.sessionToken)?.toBase58() ??
+    normalizePublicKey(record.session_token)?.toBase58() ??
+    (typeof record.sessionToken === "string" ? record.sessionToken : null) ??
+    (typeof record.session_token === "string" ? record.session_token : null);
+  if (!publicKey || !sessionToken) {
+    return null;
+  }
+  return { publicKey, sessionToken };
+}
+
+function normalizePublicKey(value: unknown): PublicKey | null {
+  if (!value) {
+    return null;
+  }
+  if (value instanceof PublicKey) {
+    return value;
+  }
+  if (typeof value === "string") {
+    try {
+      return new PublicKey(value);
+    } catch {
+      return null;
+    }
+  }
+  if (typeof value === "object" && "toBase58" in value && typeof value.toBase58 === "function") {
+    try {
+      return new PublicKey(value.toBase58());
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+async function pollSessionCredentials(sessionWallet: {
+  publicKey: PublicKey | null;
+  sessionToken: string | null;
+  getSessionToken?: () => Promise<unknown>;
+}) {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
+    const directCredentials = resolveSessionCredentials(sessionWallet.publicKey, sessionWallet.sessionToken);
+    if (directCredentials) {
+      return directCredentials;
+    }
+    if (sessionWallet.getSessionToken) {
+      try {
+        const tokenValue = await sessionWallet.getSessionToken();
+        const queriedCredentials =
+          extractSessionCredentials(tokenValue) ??
+          resolveSessionCredentials(sessionWallet.publicKey, normalizeSessionTokenValue(tokenValue));
+        if (queriedCredentials) {
+          return queriedCredentials;
+        }
+      } catch {
+        // Ignore transient provider lag and keep polling.
+      }
+    }
+    await sleep(300);
+  }
+  return null;
+}
+
+function normalizeSessionTokenValue(value: unknown): string | null {
+  const publicKey = normalizePublicKey(value);
+  if (publicKey) {
+    return publicKey.toBase58();
+  }
+  return typeof value === "string" ? value : null;
 }
 
 async function waitForSignatureStatus(

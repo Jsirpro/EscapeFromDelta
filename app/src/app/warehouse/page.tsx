@@ -2,11 +2,25 @@
 
 import { LanguageToggle } from "../../components/LanguageToggle";
 import { useI18n } from "../../i18n";
+import { deriveCollectibleDisplay } from "../../lib/loot";
 import { usePlayerProfile } from "../../wallet/usePlayerProfile";
 
 export default function WarehousePage() {
   const player = usePlayerProfile();
   const { t } = useI18n();
+  const collectibles = player.battleRecords.flatMap((record) => record.retainedAssets).map(deriveCollectibleDisplay);
+  const collectibleGroups = Array.from(
+    collectibles.reduce((groups, item) => {
+      const key = `${item.rarity}:${item.label}`;
+      const existing = groups.get(key);
+      if (existing) {
+        existing.count += 1;
+      } else {
+        groups.set(key, { ...item, count: 1 });
+      }
+      return groups;
+    }, new Map<string, typeof collectibles[number] & { count: number }>()),
+  ).map(([, value]) => value);
   return (
     <main className="shell">
       <header className="topbar">
@@ -52,8 +66,36 @@ export default function WarehousePage() {
               <span className="pill">{t.warehouse.walletOwned}</span>
             </li>
           </ul>
+          {collectibleGroups.length === 0 ? (
+            <p>{t.warehouse.noCollectibles}</p>
+          ) : (
+            <div className="loot-grid">
+              {collectibleGroups.map((item) => (
+                <div className={`loot-card loot-${item.rarity}`} key={`${item.rarity}-${item.label}`}>
+                  <span className="field-label">
+                    {item.rarity === "legendary" ? t.play.legendary : item.rarity === "epic" ? t.play.epic : t.play.rare}
+                  </span>
+                  <strong>{translateLootLabel(item.label, t)}</strong>
+                  <p>x{item.count}</p>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </section>
     </main>
   );
+}
+
+function translateLootLabel(label: string, t: ReturnType<typeof useI18n>["t"]) {
+  if (label.startsWith("Legendary Collectible ")) {
+    return `${t.play.legendary}收藏品${label.replace("Legendary Collectible ", "")}`;
+  }
+  if (label.startsWith("Epic Collectible ")) {
+    return `${t.play.epic}收藏品${label.replace("Epic Collectible ", "")}`;
+  }
+  if (label.startsWith("Rare Collectible ")) {
+    return `${t.play.rare}收藏品${label.replace("Rare Collectible ", "")}`;
+  }
+  return label;
 }
