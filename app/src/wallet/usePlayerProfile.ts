@@ -144,6 +144,10 @@ export function usePlayerProfile() {
         await wallet.moveDemoArea(area);
         return refreshRemoteSafe();
       },
+      selectSafeCaseItems: async (selectedAssets: string[], capacity: number) => {
+        await wallet.selectSafeCaseItems(selectedAssets, capacity);
+        return refreshRemoteSafe();
+      },
       settleDemoRaid: async (result: "succeeded" | "failed", raidSessionAddress?: string | null) => {
         await wallet.settleDemoRaid(result, raidSessionAddress ?? remoteProfile?.activeRaid ?? null);
         return refreshRemoteSafe();

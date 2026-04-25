@@ -22,6 +22,7 @@ export default function PlayPage() {
   const [hasLocalActiveRaid, setHasLocalActiveRaid] = useState(false);
   const [forceReadyMode, setForceReadyMode] = useState(true);
   const [safeCaseCapacity, setSafeCaseCapacity] = useState(0);
+  const [updatingSafeCase, setUpdatingSafeCase] = useState(false);
   const [armorPurchaseAmount, setArmorPurchaseAmount] = useState("1.0");
   const [weaponPurchaseAmount, setWeaponPurchaseAmount] = useState("1.0");
   const hasActiveRaid = !forceReadyMode && (hasLocalActiveRaid || Boolean(player.onChainActiveRaid));
@@ -216,6 +217,22 @@ export default function PlayPage() {
     }
   }
 
+  async function handleToggleSafeCase(assetId: string) {
+    if (!player.onChainSafeCaseCapacity) return;
+    setActionError(null);
+    setUpdatingSafeCase(true);
+    try {
+      const nextSelection = player.onChainSafeCaseItems.includes(assetId)
+        ? player.onChainSafeCaseItems.filter((item) => item !== assetId)
+        : [...player.onChainSafeCaseItems, assetId].slice(0, player.onChainSafeCaseCapacity);
+      await player.selectSafeCaseItems(nextSelection, player.onChainSafeCaseCapacity);
+    } catch (error) {
+      setActionError(error instanceof Error ? error.message : "safe-case-update-failed");
+    } finally {
+      setUpdatingSafeCase(false);
+    }
+  }
+
   async function handleResetToReady() {
     setActionError(null);
     setBusyAction("abandon");
@@ -388,6 +405,16 @@ export default function PlayPage() {
                       {item.rarity === "legendary" ? t.play.legendary : item.rarity === "epic" ? t.play.epic : t.play.rare}
                     </span>
                     <strong>{translateLootLabel(item.label, t)}</strong>
+                    {player.onChainSafeCaseCapacity > 0 ? (
+                      <button
+                        className={player.onChainSafeCaseItems.includes(item.assetId) ? "button" : "button button-secondary"}
+                        disabled={busyAction !== null || updatingSafeCase}
+                        type="button"
+                        onClick={() => void handleToggleSafeCase(item.assetId)}
+                      >
+                        {player.onChainSafeCaseItems.includes(item.assetId) ? t.play.safeCaseRemove : t.play.safeCaseKeep}
+                      </button>
+                    ) : null}
                   </div>
                 ))}
               </div>

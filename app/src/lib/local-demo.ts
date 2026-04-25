@@ -301,6 +301,32 @@ export async function buildSessionFightEnemyTransaction(
   return finalizeTransaction(provider.connection, transaction, sessionSignerKey);
 }
 
+export async function buildSessionSelectSafeCaseTransaction(
+  player: string,
+  sessionSigner: string,
+  sessionToken: string,
+  selectedAssets: string[],
+  capacity: number,
+) {
+  const { provider, program } = await ensureLocalDemoSetup();
+  const sessionSignerKey = new anchor.web3.PublicKey(sessionSigner);
+  const sessionTokenKey = new anchor.web3.PublicKey(sessionToken);
+  const { playerProfile, raidSessionAddress } = await getActiveRaid(program, player);
+  const transaction = await program.methods
+    .selectSafeCaseItems(
+      selectedAssets.map((assetId) => new anchor.web3.PublicKey(assetId)),
+      capacity,
+    )
+    .accounts({
+      signer: sessionSignerKey,
+      playerProfile,
+      raidSession: raidSessionAddress,
+      sessionToken: sessionTokenKey,
+    })
+    .transaction();
+  return finalizeTransaction(provider.connection, transaction, sessionSignerKey);
+}
+
 export async function buildMoveAreaTransaction(player: string, area: "low" | "medium" | "high") {
   const { provider, program } = await ensureLocalDemoSetup();
   const { playerKey, playerProfile, raidSessionAddress } = await getActiveRaid(program, player);

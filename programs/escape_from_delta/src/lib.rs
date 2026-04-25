@@ -59,10 +59,10 @@ pub mod escape_from_delta {
 
     pub fn select_safe_case_items(
         ctx: Context<SelectSafeCaseItems>,
-        selected_count: u8,
+        selected_assets: Vec<Pubkey>,
         capacity: u8,
     ) -> Result<()> {
-        instructions::select_safe_case_items::handler(ctx, selected_count, capacity)
+        instructions::select_safe_case_items::handler(ctx, selected_assets, capacity)
     }
 
     pub fn open_container(

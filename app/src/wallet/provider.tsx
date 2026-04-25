@@ -51,6 +51,7 @@ interface WalletState {
   openDemoContainer: (containerIndex?: number, finalRandomValue?: number) => Promise<void>;
   fightDemoEnemy: () => Promise<void>;
   moveDemoArea: (area: "low" | "medium" | "high") => Promise<void>;
+  selectSafeCaseItems: (selectedAssets: string[], capacity: number) => Promise<void>;
   settleDemoRaid: (result: "succeeded" | "failed", raidSessionAddress?: string | null) => Promise<void>;
 }
 
@@ -269,6 +270,21 @@ export function WalletProvider({ children }: { children: ReactNode }) {
           { area },
         );
       },
+      selectSafeCaseItems: async (selectedAssets, capacity) => {
+        if (!walletAddress) throw new Error("wallet-not-connected");
+        await sendSessionTransactionWithError(
+          setWalletError,
+          setLastTransactionDebug,
+          {
+            publicKey: localSessionCredentials?.publicKey ?? sessionWallet.publicKey,
+            sessionToken: localSessionCredentials?.sessionToken ?? sessionWallet.sessionToken,
+            signAndSendTransaction: sessionWallet.signAndSendTransaction,
+          },
+          "/api/tx/safe-case",
+          walletAddress,
+          { selectedAssets, capacity },
+        );
+      },
       settleDemoRaid: async (result, raidSessionAddress) => {
         if (!walletAddress) throw new Error("wallet-not-connected");
         if (!walletProvider) throw new Error("browser-wallet-missing");
@@ -429,7 +445,9 @@ async function ensureSession(sessionWallet: {
     validUntil?: number,
   ) => Promise<unknown>;
 }): Promise<SessionCredentials> {
-  const existingCredentials = resolveSessionCredentials(sessionWallet.publicKey, sessionWallet.sessionToken);
+  const existingCredentials =
+    resolveSessionCredentials(sessionWallet.publicKey, sessionWallet.sessionToken) ??
+    (await pollSessionCredentials(sessionWallet));
   if (existingCredentials) {
     return existingCredentials;
   }
@@ -445,6 +463,12 @@ async function ensureSession(sessionWallet: {
     extractSessionCredentials(createdSession) ??
     (await pollSessionCredentials(sessionWallet));
   if (!nextCredentials) {
+    if (isSessionAlreadyAllocatedError(createdSession)) {
+      const recoveredCredentials = await pollSessionCredentials(sessionWallet);
+      if (recoveredCredentials) {
+        return recoveredCredentials;
+      }
+    }
     throw new Error("session-wallet-missing");
   }
   return nextCredentials;
@@ -554,6 +578,9 @@ function extractSessionCredentials(value: unknown): SessionCredentials | null {
   }
   const record = value as Record<string, unknown>;
   if (typeof record.error === "string" && record.error.length > 0) {
+    if (record.error.includes("already in use")) {
+      return null;
+    }
     throw new Error(record.error);
   }
   const publicKey =
@@ -629,6 +656,14 @@ function normalizeSessionTokenValue(value: unknown): string | null {
     return publicKey.toBase58();
   }
   return typeof value === "string" ? value : null;
+}
+
+function isSessionAlreadyAllocatedError(value: unknown) {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+  const record = value as Record<string, unknown>;
+  return typeof record.error === "string" && record.error.includes("already in use");
 }
 
 async function waitForSignatureStatus(
