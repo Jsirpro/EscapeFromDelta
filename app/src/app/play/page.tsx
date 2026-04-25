@@ -610,7 +610,12 @@ function formatPlayError(error: string, t: ReturnType<typeof useI18n>["t"]) {
   if (error.includes('"Custom":6009') || error.includes("InvalidEquipment")) {
     return t.play.insufficientLoadout;
   }
-  if (error.includes("session-wallet-missing") || error.includes("session-create-not-supported")) {
+  if (
+    error.includes("session-wallet-missing") ||
+    error.includes("session-create-not-supported") ||
+    error.includes("session-token-not-initialized") ||
+    error.includes('"Custom":3012')
+  ) {
     return t.play.sessionRequired;
   }
   return error;

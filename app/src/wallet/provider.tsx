@@ -1,9 +1,11 @@
 "use client";
 
+import * as anchor from "@coral-xyz/anchor";
 import { useSessionKeyManager } from "@magicblock-labs/gum-react-sdk";
 import { Connection, PublicKey, Transaction, type SendOptions } from "@solana/web3.js";
 import bs58 from "bs58";
 import { createContext, type ReactNode, useContext, useMemo, useState } from "react";
+import idl from "../../../target/idl/escape_from_delta.json";
 import { decodeBattleRecord } from "../../../clients/src/queries/battleRecords";
 import { decodePlayerProfile } from "../../../clients/src/queries/player";
 import type { BattleRecord, PlayerProfile } from "../../../clients/src/types";
@@ -288,6 +290,19 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       settleDemoRaid: async (result, raidSessionAddress) => {
         if (!walletAddress) throw new Error("wallet-not-connected");
         if (!walletProvider) throw new Error("browser-wallet-missing");
+        if (result === "failed" && raidSessionAddress) {
+          await sendDirectSettlementTransactionWithError(
+            setWalletError,
+            setLastTransactionDebug,
+            connection,
+            walletAddress,
+            walletProvider,
+            raidSessionAddress,
+          );
+          await sessionWallet.revokeSession?.();
+          setLocalSessionCredentials(null);
+          return;
+        }
         await sendWalletTransactionWithError(
           setWalletError,
           setLastTransactionDebug,
@@ -435,6 +450,51 @@ async function sendWalletTransactionWithError(
   }
 }
 
+async function sendDirectSettlementTransactionWithError(
+  setWalletError: (message: string | null) => void,
+  setLastTransactionDebug: (value: Record<string, unknown>) => void,
+  connection: Connection,
+  player: string,
+  provider: BrowserWalletProvider,
+  raidSessionAddress: string,
+) {
+  setWalletError(null);
+  try {
+    const transaction = await buildDirectSettlementTransaction(connection, player, raidSessionAddress);
+    const blockhash = await connection.getLatestBlockhash("confirmed");
+    transaction.recentBlockhash = blockhash.blockhash;
+    transaction.feePayer = new PublicKey(player);
+
+    setLastTransactionDebug({
+      path: "client/tx/fail",
+      request: { player, raidSession: raidSessionAddress },
+      apiStatus: "client-built",
+    });
+
+    const signedTransaction = await provider.signTransaction!(transaction);
+    const signature = await connection.sendRawTransaction(signedTransaction.serialize(), {
+      skipPreflight: true,
+    });
+    await waitForSignatureStatus(connection, signature, blockhash.lastValidBlockHeight);
+    setLastTransactionDebug({
+      path: "client/tx/fail",
+      request: { player, raidSession: raidSessionAddress },
+      signature,
+      sentBy: "signTransaction",
+    });
+    return signature;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "wallet-transaction-failed";
+    setLastTransactionDebug({
+      path: "client/tx/fail",
+      request: { player, raidSession: raidSessionAddress },
+      frontendError: serializeError(error),
+    });
+    setWalletError(message);
+    throw error;
+  }
+}
+
 async function ensureSession(sessionWallet: {
   publicKey: PublicKey | null;
   sessionToken: string | null;
@@ -448,7 +508,7 @@ async function ensureSession(sessionWallet: {
   const existingCredentials =
     resolveSessionCredentials(sessionWallet.publicKey, sessionWallet.sessionToken) ??
     (await pollSessionCredentials(sessionWallet));
-  if (existingCredentials) {
+  if (existingCredentials && (await isSessionTokenUsable(existingCredentials.sessionToken))) {
     return existingCredentials;
   }
   if (!sessionWallet.createSession) {
@@ -465,11 +525,14 @@ async function ensureSession(sessionWallet: {
   if (!nextCredentials) {
     if (isSessionAlreadyAllocatedError(createdSession)) {
       const recoveredCredentials = await pollSessionCredentials(sessionWallet);
-      if (recoveredCredentials) {
+      if (recoveredCredentials && (await isSessionTokenUsable(recoveredCredentials.sessionToken))) {
         return recoveredCredentials;
       }
     }
     throw new Error("session-wallet-missing");
+  }
+  if (!(await isSessionTokenUsable(nextCredentials.sessionToken))) {
+    throw new Error("session-token-not-initialized");
   }
   return nextCredentials;
 }
@@ -547,7 +610,11 @@ async function sendSessionTransactionWithError(
     });
     return signatures[0];
   } catch (error) {
-    const message = error instanceof Error ? error.message : "session-transaction-failed";
+    const message = isInvalidSessionTokenError(error)
+      ? "session-token-not-initialized"
+      : error instanceof Error
+        ? error.message
+        : "session-transaction-failed";
     setLastTransactionDebug({
       path,
       request: { player, ...extraPayload },
@@ -563,6 +630,49 @@ function decodeBase64(value: string): Uint8Array {
     return Uint8Array.from(Buffer.from(value, "base64"));
   }
   return Uint8Array.from(window.atob(value), (character) => character.charCodeAt(0));
+}
+
+async function buildDirectSettlementTransaction(
+  connection: Connection,
+  player: string,
+  raidSessionAddress: string,
+) {
+  const playerKey = new PublicKey(player);
+  const playerProfile = PublicKey.findProgramAddressSync(
+    [new TextEncoder().encode("player"), playerKey.toBytes()],
+    new PublicKey(PROGRAM_ID),
+  )[0];
+  const raidSession = new PublicKey(raidSessionAddress);
+  const raidAccount = await connection.getAccountInfo(raidSession, "confirmed");
+  if (!raidAccount) {
+    throw new Error("missing-raid-session");
+  }
+  const raidId = new DataView(
+    raidAccount.data.buffer,
+    raidAccount.data.byteOffset + 8 + 2,
+    8,
+  ).getBigUint64(0, true);
+  const raidIdBytes = new Uint8Array(8);
+  new DataView(raidIdBytes.buffer).setBigUint64(0, raidId, true);
+  const battleRecord = PublicKey.findProgramAddressSync(
+    [new TextEncoder().encode("battle_record"), playerProfile.toBytes(), raidIdBytes],
+    new PublicKey(PROGRAM_ID),
+  )[0];
+  const provider = {
+    connection,
+    publicKey: playerKey,
+  } as anchor.AnchorProvider;
+  const program = new anchor.Program(idl as anchor.Idl, provider);
+  return program.methods
+    .settleFailedRaid()
+    .accounts({
+      player: playerKey,
+      playerProfile,
+      raidSession,
+      battleRecord,
+      systemProgram: anchor.web3.SystemProgram.programId,
+    })
+    .transaction();
 }
 
 function resolveSessionCredentials(publicKey: PublicKey | null, sessionToken: string | null): SessionCredentials | null {
@@ -658,6 +768,16 @@ function normalizeSessionTokenValue(value: unknown): string | null {
   return typeof value === "string" ? value : null;
 }
 
+async function isSessionTokenUsable(sessionToken: string) {
+  try {
+    const connection = new Connection(RPC_URL, "confirmed");
+    const account = await connection.getAccountInfo(new PublicKey(sessionToken), "confirmed");
+    return Boolean(account);
+  } catch {
+    return false;
+  }
+}
+
 function isSessionAlreadyAllocatedError(value: unknown) {
   if (!value || typeof value !== "object") {
     return false;
@@ -711,6 +831,10 @@ function isAlreadyProcessedError(error: unknown) {
 
 function isFetchTransportError(error: unknown) {
   return error instanceof TypeError && error.message.includes("Failed to fetch");
+}
+
+function isInvalidSessionTokenError(error: unknown) {
+  return error instanceof Error && error.message.includes('"Custom":3012');
 }
 
 function serializeError(error: unknown) {

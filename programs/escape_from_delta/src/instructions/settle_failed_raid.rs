@@ -62,6 +62,7 @@ pub fn handler(ctx: Context<SettleFailedRaid>) -> Result<(u16, u16)> {
     raid_session.status = if timed_out { RaidStatus::TimedOut } else { RaidStatus::Failed };
     raid_session.current_armor_tenths = 0;
     raid_session.current_weapon_tenths = 0;
+    raid_session.pending_loot = None;
     raid_session.carried_loot = raid_session.safe_case_selection.clone();
     raid_session.settled_at = Some(now);
 

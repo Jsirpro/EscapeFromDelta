@@ -62,6 +62,7 @@ pub fn handler(
     let won = chance > 0 && (final_random_value % 100) < u64::from(chance);
     let degraded_armor = degrade_combat(armor);
     let degraded_weapon = degrade_combat(weapon);
+    let current_area = raid_session.current_area;
 
     let event_id = raid_session.random_events.len() as u64 + 1;
     raid_session.random_events.push(RandomEventAudit::new(
@@ -77,14 +78,35 @@ pub fn handler(
         raid_session.status = RaidStatus::Active;
         raid_session.current_armor_tenths = degraded_armor;
         raid_session.current_weapon_tenths = degraded_weapon;
+        if let Some(loot_pubkey) = raid_session.pending_loot.take() {
+            let loot_event_id = raid_session.random_events.len() as u64 + 1;
+            raid_session.carried_loot.push(loot_pubkey);
+            raid_session.random_events.push(RandomEventAudit::new(
+                loot_event_id,
+                RandomEventType::LootDrop,
+                final_random_value,
+                chance,
+                loot_outcome_for(current_area),
+                now,
+            )?);
+        }
         return Ok((true, degraded_armor, degraded_weapon));
     }
 
     raid_session.status = RaidStatus::Failed;
     raid_session.current_armor_tenths = 0;
     raid_session.current_weapon_tenths = 0;
+    raid_session.pending_loot = None;
     raid_session.carried_loot.clear();
     raid_session.settled_at = Some(now);
     player_profile.active_raid = None;
     Ok((false, 0, 0))
+}
+
+fn loot_outcome_for(level: crate::state::RiskLevel) -> RandomOutcome {
+    match level {
+        crate::state::RiskLevel::Low => RandomOutcome::LootCommon,
+        crate::state::RiskLevel::Medium => RandomOutcome::LootRare,
+        crate::state::RiskLevel::High => RandomOutcome::LootEpic,
+    }
 }

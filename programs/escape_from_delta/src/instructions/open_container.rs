@@ -59,6 +59,8 @@ pub fn handler(
     let current_area = raid_session.current_area;
     let raid_id = raid_session.raid_id;
     let event_id = raid_session.random_events.len() as u64 + 1;
+    let loot_event_id = raid_session.random_events.len() as u64 + 2;
+    let loot_pubkey = synthetic_loot_key(raid_id, loot_event_id);
     let area_state = current_area_state_mut(&mut raid_session.area_states, current_area)?;
     require!(container_index < area_state.containers_total, EscapeError::InvalidContainer);
     require!(
@@ -92,11 +94,11 @@ pub fn handler(
 
     if encountered {
         raid_session.status = RaidStatus::PendingBattle;
+        raid_session.pending_loot = Some(loot_pubkey);
         return Ok(encounter_threshold);
     }
 
-    let loot_event_id = raid_session.random_events.len() as u64 + 1;
-    let loot_pubkey = synthetic_loot_key(raid_id, loot_event_id);
+    raid_session.pending_loot = None;
     raid_session.carried_loot.push(loot_pubkey);
     raid_session.random_events.push(RandomEventAudit::new(
         loot_event_id,

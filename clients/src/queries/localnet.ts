@@ -43,6 +43,10 @@ export interface LootDisplayItem {
 class ByteReader {
   constructor(private readonly bytes: Uint8Array, private offset = 0) {}
 
+  position(): number {
+    return this.offset;
+  }
+
   readU8(): number {
     return this.bytes[this.offset++] ?? 0;
   }
@@ -306,7 +310,15 @@ function readRandomEventAudits(reader: ByteReader): RandomEventAudit[] {
 
 function decodeRaidSessionAccount(base64: string): DecodedRaidSessionAccount["raid"] {
   const bytes = Buffer.from(base64, "base64");
-  const reader = new ByteReader(bytes.subarray(8));
+  try {
+    return decodeRaidSessionLayout(bytes.subarray(8), true);
+  } catch {
+    return decodeRaidSessionLayout(bytes.subarray(8), false);
+  }
+}
+
+function decodeRaidSessionLayout(bytes: Uint8Array, hasPendingLoot: boolean): DecodedRaidSessionAccount["raid"] {
+  const reader = new ByteReader(bytes);
   const _schemaVersion = reader.readU16();
   const _raidId = reader.readU64();
   const _playerProfile = reader.readPubkey();
@@ -318,6 +330,9 @@ function decodeRaidSessionAccount(base64: string): DecodedRaidSessionAccount["ra
   const _selectedSafeCase = reader.readOptionalPubkey();
   const safeCaseCapacity = reader.readU8();
   const safeCaseSelectionLength = reader.readU32();
+  if (safeCaseSelectionLength > 3) {
+    throw new Error("invalid-safe-case-length");
+  }
   const safeCaseItems: string[] = [];
   for (let index = 0; index < safeCaseSelectionLength; index += 1) {
     safeCaseItems.push(reader.readPubkey());
@@ -328,6 +343,9 @@ function decodeRaidSessionAccount(base64: string): DecodedRaidSessionAccount["ra
   const _currentWeaponTenths = reader.readU16();
   const currentArea = decodeRiskLevel(reader.readU8());
   const areaStatesLength = reader.readU32();
+  if (areaStatesLength > 3) {
+    throw new Error("invalid-area-state-length");
+  }
   for (let index = 0; index < areaStatesLength; index += 1) {
     reader.readU8();
     reader.readU8();
@@ -336,7 +354,14 @@ function decodeRaidSessionAccount(base64: string): DecodedRaidSessionAccount["ra
     reader.readU16();
     reader.readU16();
   }
-  const carriedLoot = reader.readPubkeyVec();
+  if (hasPendingLoot) {
+    reader.readOptionalPubkey();
+  }
+  const carriedLootLength = reader.readU32();
+  if (carriedLootLength > 64) {
+    throw new Error("invalid-carried-loot-length");
+  }
+  const carriedLoot = Array.from({ length: carriedLootLength }, () => reader.readPubkey());
   return {
     status,
     currentArea,

@@ -118,6 +118,7 @@ pub fn handler(
     raid_session.current_weapon_tenths = weapon_tenths;
     raid_session.current_area = RiskLevel::Low;
     raid_session.area_states = area_states;
+    raid_session.pending_loot = None;
     raid_session.carried_loot = Vec::new();
     raid_session.random_events = Vec::new();
     raid_session.started_at = Clock::get()?.unix_timestamp;

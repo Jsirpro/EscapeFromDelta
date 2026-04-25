@@ -172,6 +172,7 @@ pub struct RaidSession {
     pub current_area: RiskLevel,
     #[max_len(3)]
     pub area_states: Vec<RiskAreaRuntime>,
+    pub pending_loot: Option<Pubkey>,
     #[max_len(64)]
     pub carried_loot: Vec<Pubkey>,
     #[max_len(128)]

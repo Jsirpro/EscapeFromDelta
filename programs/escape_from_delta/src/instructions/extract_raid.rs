@@ -63,6 +63,7 @@ pub fn handler(ctx: Context<ExtractRaid>) -> Result<()> {
     let random_event_audits = raid_session.random_events.clone();
 
     raid_session.status = RaidStatus::Succeeded;
+    raid_session.pending_loot = None;
     raid_session.settled_at = Some(now);
 
     let battle_record = &mut ctx.accounts.battle_record;
