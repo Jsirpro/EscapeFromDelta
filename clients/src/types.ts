@@ -9,7 +9,7 @@ export const SCHEMA_VERSION = 1;
 export const EDCOINS_STARTER_GRANT = 20_000n as EdcoinsLamports;
 export const STARTER_ARMOR_TENTHS = 200 as Tenths;
 export const STARTER_WEAPON_TENTHS = 200 as Tenths;
-export const SOL_TO_EDCOINS_RATE = 10_000n;
+export const SOL_TO_EDCOINS_RATE = 10_000_000n;
 export const RAID_TIMEOUT_SECONDS = 120;
 export const DEFAULT_RECORD_LIMIT = 50;
 

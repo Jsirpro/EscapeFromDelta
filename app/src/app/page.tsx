@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
+import { PublicKey } from "@solana/web3.js";
 
 import { EdcoinsConversionPanel } from "../components/EdcoinsConversionPanel";
 import { LanguageToggle } from "../components/LanguageToggle";
@@ -21,6 +22,13 @@ export default function PlayerHomePage() {
   const player = usePlayerProfile();
   const { language, t } = useI18n();
   const walletError = useMemo(() => translateWalletError(player.walletError, language), [player.walletError, language]);
+  const playerProfilePda = useMemo(() => {
+    if (!player.walletAddress) return null;
+    return PublicKey.findProgramAddressSync(
+      [Buffer.from("player"), new PublicKey(player.walletAddress).toBuffer()],
+      new PublicKey(process.env.NEXT_PUBLIC_PROGRAM_ID ?? process.env.PROGRAM_ID ?? "7ueVgYfrwidjpwMCBfGyHCoVpaVNe7Ep1h2Mxv1ENBYQ"),
+    )[0].toBase58();
+  }, [player.walletAddress]);
 
   return (
     <main className="shell">
@@ -83,6 +91,22 @@ export default function PlayerHomePage() {
               <strong className="stat-value">{player.weaponPointBalance.toFixed(1)}</strong>
             </div>
           </div>
+
+          {playerProfilePda ? (
+            <div className="inventory-item">
+              <div>
+                <span className="stat-label">{t.common.playerProfilePda}</span>
+                <strong>{playerProfilePda}</strong>
+              </div>
+              <button
+                className="button button-secondary"
+                type="button"
+                onClick={() => void navigator.clipboard.writeText(playerProfilePda)}
+              >
+                {t.common.copy}
+              </button>
+            </div>
+          ) : null}
         </div>
 
         <div className="scene" aria-label={t.home.sceneLabel}>
@@ -109,6 +133,24 @@ export default function PlayerHomePage() {
         description={t.conversion.description}
         buttonLabel={t.conversion.button}
       />
+
+      {player.connected && !player.onChainProfile ? (
+        <details>
+          <summary>Profile Debug</summary>
+          <pre>
+            {JSON.stringify(
+              {
+                walletAddress: player.walletAddress,
+                onChainProfileLoaded: player.onChainProfileLoaded,
+                onChainActiveRaid: player.onChainActiveRaid,
+                lastTransactionDebug: player.lastTransactionDebug,
+              },
+              null,
+              2,
+            )}
+          </pre>
+        </details>
+      ) : null}
     </main>
   );
 }

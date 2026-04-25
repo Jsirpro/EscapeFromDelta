@@ -1,8 +1,8 @@
 import { createHash } from "node:crypto";
 
-import type { BattleRecord, PlayerProfile, RandomEventAudit } from "../types";
+import type { BattleRecord, PlayerProfile, RaidStatus, RandomEventAudit, RiskLevel } from "../types";
 
-const RPC_URL = process.env.RPC_URL ?? process.env.NEXT_PUBLIC_RPC_URL ?? "http://127.0.0.1:8899";
+const RPC_URL = process.env.RPC_URL ?? process.env.NEXT_PUBLIC_RPC_URL ?? "https://api.devnet.solana.com";
 const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 const BASE58_INDEXES = new Map(BASE58_ALPHABET.split("").map((char, index) => [char, index]));
 
@@ -21,6 +21,19 @@ interface DecodedPlayerProfileAccount {
 interface DecodedBattleRecordAccount {
   address: string;
   record: BattleRecord;
+}
+
+interface DecodedRaidSessionAccount {
+  address: string;
+  raid: {
+    status: RaidStatus;
+    currentArea: RiskLevel;
+    lootItems: Array<{
+      assetId: string;
+      rarity: "rare" | "epic" | "legendary";
+      label: string;
+    }>;
+  };
 }
 
 class ByteReader {
@@ -83,6 +96,15 @@ export async function fetchPlayerProfileByWallet(
   programId: string,
   rpcUrl = RPC_URL,
 ): Promise<DecodedPlayerProfileAccount | null> {
+  const derivedAddress = derivePlayerProfileAddress(wallet, programId);
+  const directAccount = await getAccountInfo(derivedAddress, rpcUrl);
+  if (directAccount?.data?.[0]) {
+    return {
+      address: derivedAddress,
+      profile: decodePlayerProfileAccount(directAccount.data[0]),
+    };
+  }
+
   const accounts = await getProgramAccounts(programId, rpcUrl, [
     {
       memcmp: {
@@ -142,6 +164,20 @@ export async function fetchBattleRecordsByWallet(
   return fetchBattleRecordsByPlayer(profile.address, programId, limit, rpcUrl);
 }
 
+export async function fetchRaidSessionByAddress(
+  address: string,
+  rpcUrl = RPC_URL,
+): Promise<DecodedRaidSessionAccount | null> {
+  const account = await getAccountInfo(address, rpcUrl);
+  if (!account?.data?.[0]) {
+    return null;
+  }
+  return {
+    address,
+    raid: decodeRaidSessionAccount(account.data[0]),
+  };
+}
+
 async function getProgramAccounts(
   programId: string,
   rpcUrl: string,
@@ -173,6 +209,40 @@ async function getProgramAccounts(
     throw new Error(payload.error.message ?? "rpc-error");
   }
   return payload.result ?? [];
+}
+
+async function getAccountInfo(
+  address: string,
+  rpcUrl: string,
+): Promise<{ data: [string, string] } | null> {
+  const response = await fetch(rpcUrl, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method: "getAccountInfo",
+      params: [
+        address,
+        {
+          encoding: "base64",
+        },
+      ],
+    }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`rpc-http-${response.status}`);
+  }
+
+  const payload = (await response.json()) as {
+    error?: { message?: string };
+    result?: { value?: { data: [string, string] } | null };
+  };
+  if (payload.error) {
+    throw new Error(payload.error.message ?? "rpc-error");
+  }
+  return payload.result?.value ?? null;
 }
 
 function decodePlayerProfileAccount(base64: string): PlayerProfile {
@@ -230,10 +300,82 @@ function readRandomEventAudits(reader: ByteReader): RandomEventAudit[] {
   return audits;
 }
 
+function decodeRaidSessionAccount(base64: string): DecodedRaidSessionAccount["raid"] {
+  const bytes = Buffer.from(base64, "base64");
+  const reader = new ByteReader(bytes.subarray(8));
+  const _schemaVersion = reader.readU16();
+  const _raidId = reader.readU64();
+  const _playerProfile = reader.readPubkey();
+  const status = decodeRaidStatus(reader.readU8());
+  const _lockedDifficulty = reader.readPubkey();
+  const _lockedDifficultyId = reader.readU64();
+  const _lockedDifficultyVersion = reader.readU32();
+  const _entryFeePaid = reader.readU64();
+  const _selectedSafeCase = reader.readOptionalPubkey();
+  const _safeCaseCapacity = reader.readU8();
+  const safeCaseSelectionLength = reader.readU32();
+  for (let index = 0; index < safeCaseSelectionLength; index += 1) {
+    reader.readPubkey();
+  }
+  const _armorAsset = reader.readPubkey();
+  const _weaponAsset = reader.readPubkey();
+  const _currentArmorTenths = reader.readU16();
+  const _currentWeaponTenths = reader.readU16();
+  const currentArea = decodeRiskLevel(reader.readU8());
+  const areaStatesLength = reader.readU32();
+  for (let index = 0; index < areaStatesLength; index += 1) {
+    reader.readU8();
+    reader.readU8();
+    reader.readU8();
+    reader.readU16();
+    reader.readU16();
+    reader.readU16();
+  }
+  const carriedLoot = reader.readPubkeyVec();
+  return {
+    status,
+    currentArea,
+    lootItems: carriedLoot.map(deriveCollectibleDisplay),
+  };
+}
+
+function deriveCollectibleDisplay(assetId: string): DecodedRaidSessionAccount["raid"]["lootItems"][number] {
+  const bytes = decodeBase58(assetId);
+  const rarityRoll = ((bytes[0] ?? 0) + (bytes[7] ?? 0) + (bytes[13] ?? 0)) % 100;
+  const rarity = rarityRoll < 8 ? "legendary" : rarityRoll < 30 ? "epic" : "rare";
+  const poolSize = rarity === "legendary" ? 5 : rarity === "epic" ? 10 : 20;
+  const pickSeed =
+    (((bytes[3] ?? 0) << 16) | ((bytes[11] ?? 0) << 8) | (bytes[19] ?? 0)) >>> 0;
+  const serial = (pickSeed % poolSize) + 1;
+  const labelPrefix =
+    rarity === "legendary" ? "Legendary Collectible" : rarity === "epic" ? "Epic Collectible" : "Rare Collectible";
+  return {
+    assetId,
+    rarity,
+    label: `${labelPrefix} ${serial}`,
+  };
+}
+
 function decodeRaidResult(value: number): BattleRecord["result"] {
   if (value === 0) return "succeeded";
   if (value === 1) return "failed";
   return "timed_out";
+}
+
+function decodeRaidStatus(value: number): RaidStatus {
+  if (value === 1) return "active";
+  if (value === 2) return "pending_battle";
+  if (value === 3) return "extracting";
+  if (value === 4) return "succeeded";
+  if (value === 5) return "failed";
+  if (value === 6) return "timed_out";
+  return "preparing";
+}
+
+function decodeRiskLevel(value: number): RiskLevel {
+  if (value === 1) return "medium";
+  if (value === 2) return "high";
+  return "low";
 }
 
 function decodeRandomEventType(value: number): RandomEventAudit["type"] {
@@ -260,6 +402,14 @@ function accountDiscriminator(name: string): Uint8Array {
   return createHash("sha256").update(`account:${name}`).digest().subarray(0, 8);
 }
 
+function derivePlayerProfileAddress(wallet: string, programId: string): string {
+  const [address] = findProgramAddress(
+    [new TextEncoder().encode("player"), decodeBase58(wallet)],
+    decodeBase58(programId),
+  );
+  return encodeBase58(address);
+}
+
 export function encodeBase58(bytes: Uint8Array): string {
   let digits = [0];
   for (const byte of bytes) {
@@ -284,6 +434,37 @@ export function encodeBase58(bytes: Uint8Array): string {
     output += BASE58_ALPHABET[digits[index]];
   }
   return output || "1";
+}
+
+function findProgramAddress(seeds: Uint8Array[], programId: Uint8Array): [Uint8Array, number] {
+  for (let bump = 255; bump >= 0; bump -= 1) {
+    const candidate = createProgramAddress([...seeds, Uint8Array.of(bump)], programId);
+    if (candidate) {
+      return [candidate, bump];
+    }
+  }
+  throw new Error("unable-to-derive-pda");
+}
+
+function createProgramAddress(seeds: Uint8Array[], programId: Uint8Array): Uint8Array | null {
+  const buffer = Buffer.concat([
+    ...seeds.map((seed) => Buffer.from(seed)),
+    Buffer.from(programId),
+    Buffer.from("ProgramDerivedAddress"),
+  ]);
+  const hash = createHash("sha256").update(buffer).digest();
+  return isOnCurve(hash) ? null : Uint8Array.from(hash);
+}
+
+function isOnCurve(bytes: Uint8Array): boolean {
+  try {
+    // Lazy require keeps this file usable in server/runtime contexts already using Buffer APIs.
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { PublicKey } = require("@solana/web3.js");
+    return PublicKey.isOnCurve(bytes);
+  } catch {
+    return false;
+  }
 }
 
 export function decodeBase58(value: string): Uint8Array {

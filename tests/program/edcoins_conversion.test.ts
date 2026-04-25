@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 import { SOL_TO_EDCOINS_RATE } from "../../clients/src/types";
 
 describe("SOL to EDcoins conversion program contract", () => {
-  it("uses the fixed 1:10000 rate", () => {
-    expect(2n * SOL_TO_EDCOINS_RATE).toBe(20_000n);
+  it("uses the fixed 1:10000000 per SOL rate", () => {
+    expect(SOL_TO_EDCOINS_RATE).toBe(10_000_000n);
   });
 
   it("rejects zero amount and has no reverse redemption path", () => {

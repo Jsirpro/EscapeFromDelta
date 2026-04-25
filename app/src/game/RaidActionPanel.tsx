@@ -43,7 +43,7 @@ function translateStatus(status: RaidUiState["status"], t: ReturnType<typeof use
   const labels = {
     preparing: t.play.startRaid,
     transitioning: t.play.land,
-    active: t.play.raidStatus,
+    active: t.play.inRaid,
     pending_battle: t.play.encounter,
     succeeded: t.play.extracted,
     failed: t.play.raidFailed,
@@ -54,7 +54,7 @@ function translateStatus(status: RaidUiState["status"], t: ReturnType<typeof use
 function translateAction(action: string, t: ReturnType<typeof useI18n>["t"]) {
   const labels: Record<string, string> = {
     start: t.play.startRaid,
-    open: t.play.encounter,
+    open: t.play.openContainer,
     move: t.play.moveMedium,
     extract: t.play.extract,
     fight: t.play.winBattle,

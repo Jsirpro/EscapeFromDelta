@@ -18,28 +18,45 @@ interface RemotePlayerProfilePayload {
   activeRaid?: string;
 }
 
+interface RemoteRaidPayload {
+  status: "preparing" | "active" | "pending_battle" | "extracting" | "succeeded" | "failed" | "timed_out";
+  currentArea: "low" | "medium" | "high";
+  lootItems: Array<{
+    assetId: string;
+    rarity: "rare" | "epic" | "legendary";
+    label: string;
+  }>;
+}
+
 export function usePlayerProfile() {
   const wallet = useWalletState();
   const [conversionError, setConversionError] = useState<string | null>(null);
   const [remoteProfile, setRemoteProfile] = useState<PlayerProfile | null>(null);
   const [remoteBattleRecords, setRemoteBattleRecords] = useState<BattleRecord[] | null>(null);
+  const [remoteRaid, setRemoteRaid] = useState<RemoteRaidPayload | null>(null);
+  const [remoteLoaded, setRemoteLoaded] = useState(false);
   const profile = wallet.profile;
 
   const refreshRemote = async () => {
     if (!wallet.connected || !wallet.walletAddress) {
       setRemoteProfile(null);
       setRemoteBattleRecords(null);
+      setRemoteRaid(null);
+      setRemoteLoaded(false);
       return;
     }
     const [playerPayload, recordPayload] = await Promise.all([
-      fetch(`/api/player/${wallet.walletAddress}`).then((response) => response.json()),
-      fetch(`/api/records/${wallet.walletAddress}?limit=50`).then((response) => response.json()),
+      fetch(`/api/player/${wallet.walletAddress}`, { cache: "no-store" }).then((response) => response.json()),
+      fetch(`/api/records/${wallet.walletAddress}?limit=50`, { cache: "no-store" }).then((response) => response.json()),
     ]);
     const nextProfile = playerPayload.profile ? hydrateRemoteProfile(playerPayload.profile) : null;
     const nextRecords = recordPayload.records ?? [];
+    const nextRaid = playerPayload.raid ?? null;
     setRemoteProfile(nextProfile);
     setRemoteBattleRecords(nextRecords);
-    return { profile: nextProfile, records: nextRecords };
+    setRemoteRaid(nextRaid);
+    setRemoteLoaded(true);
+    return { profile: nextProfile, records: nextRecords, raid: nextRaid };
   };
 
   useEffect(() => {
@@ -48,12 +65,22 @@ export function usePlayerProfile() {
       if (!cancelled) {
         setRemoteProfile(null);
         setRemoteBattleRecords(null);
+        setRemoteRaid(null);
+        setRemoteLoaded(true);
       }
     });
 
     return () => {
       cancelled = true;
     };
+  }, [wallet.connected, wallet.walletAddress]);
+
+  useEffect(() => {
+    if (!wallet.connected || !wallet.walletAddress) return;
+    const intervalId = window.setInterval(() => {
+      void refreshRemote().catch(() => undefined);
+    }, 3_000);
+    return () => window.clearInterval(intervalId);
   }, [wallet.connected, wallet.walletAddress]);
 
   async function refreshRemoteSafe() {
@@ -67,27 +94,34 @@ export function usePlayerProfile() {
   return useMemo(
     () => ({
       ...wallet,
-      profile: remoteProfile ?? profile,
+      profile: wallet.connected ? remoteProfile : profile,
       onChainProfile: remoteProfile,
       onChainActiveRaid: remoteProfile?.activeRaid ?? null,
-      onChainProfileLoaded: remoteProfile !== null,
+      onChainRaidStatus: remoteRaid?.status ?? null,
+      onChainRaidArea: remoteRaid?.currentArea ?? null,
+      onChainLootItems: remoteRaid?.lootItems ?? [],
+      onChainProfileLoaded: remoteLoaded,
       conversionError,
       setConversionError,
-      edcoinsBalance: (remoteProfile?.edcoinsBalance ?? profile?.edcoinsBalance) ?? 0n,
+      edcoinsBalance: wallet.connected ? (remoteProfile?.edcoinsBalance ?? 0n) : (profile?.edcoinsBalance ?? 0n),
       armorPointBalance: remoteProfile
         ? Number(formatTenths(remoteProfile.armorPointBalance))
-        : profile
+        : wallet.connected
+          ? 0
+          : profile
           ? Number(formatTenths(profile.armorPointBalance))
           : 0,
       weaponPointBalance: remoteProfile
         ? Number(formatTenths(remoteProfile.weaponPointBalance))
-        : profile
+        : wallet.connected
+          ? 0
+          : profile
           ? Number(formatTenths(profile.weaponPointBalance))
           : 0,
       battleRecords: remoteBattleRecords ?? wallet.battleRecords,
       refreshRemote,
-      purchaseLoadoutPoints: async (kind: "armor" | "weapon") => {
-        await wallet.purchaseLoadoutPoints(kind);
+      purchaseLoadoutPoints: async (kind: "armor" | "weapon", amountTenths = 10) => {
+        await wallet.purchaseLoadoutPoints(kind, amountTenths);
         return refreshRemoteSafe();
       },
       startDemoRaid: async () => {
@@ -106,13 +140,17 @@ export function usePlayerProfile() {
         await wallet.moveDemoArea(area);
         return refreshRemoteSafe();
       },
-      settleDemoRaid: async (result: "succeeded" | "failed") => {
-        await wallet.settleDemoRaid(result);
+      settleDemoRaid: async (result: "succeeded" | "failed", raidSessionAddress?: string | null) => {
+        await wallet.settleDemoRaid(result, raidSessionAddress ?? remoteProfile?.activeRaid ?? null);
         return refreshRemoteSafe();
       },
       duplicateGrant: false,
+      convertDemoSol: async (solAmount = 1n) => {
+        await wallet.convertDemoSol(solAmount);
+        return refreshRemoteSafe();
+      },
     }),
-    [wallet, profile, remoteProfile, remoteBattleRecords, conversionError],
+    [wallet, profile, remoteProfile, remoteBattleRecords, remoteRaid, conversionError, remoteLoaded],
   );
 }
 

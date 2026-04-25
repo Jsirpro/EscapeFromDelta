@@ -1,4 +1,5 @@
 use anchor_lang::prelude::*;
+use anchor_lang::solana_program::native_token::LAMPORTS_PER_SOL;
 
 use crate::errors::EscapeError;
 use crate::state::constants::*;
@@ -32,7 +33,10 @@ pub fn handler(ctx: Context<ConvertSolToEdcoins>, sol_amount: u64) -> Result<u64
         ctx.accounts.game_config.sol_treasury,
         EscapeError::InvalidAccount
     );
-    let edcoins_credit = checked_mul_u64(sol_amount, SOL_TO_EDCOINS_RATE)?;
+    let edcoins_credit = checked_mul_u64(sol_amount, SOL_TO_EDCOINS_RATE)?
+        .checked_div(LAMPORTS_PER_SOL)
+        .ok_or(EscapeError::ArithmeticOverflow)?;
+    require!(edcoins_credit > 0, EscapeError::InvalidNumericRange);
 
     let ix = anchor_lang::solana_program::system_instruction::transfer(
         &ctx.accounts.player.key(),

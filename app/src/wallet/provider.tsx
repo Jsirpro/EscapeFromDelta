@@ -45,13 +45,13 @@ interface WalletState {
   battleRecordAccounts: AccountInfoLike[];
   profile: PlayerProfile | null;
   battleRecords: BattleRecord[];
-  convertDemoSol: (solAmount?: bigint) => void;
-  purchaseLoadoutPoints: (kind: "armor" | "weapon") => Promise<void>;
+  convertDemoSol: (solAmount?: bigint) => Promise<void>;
+  purchaseLoadoutPoints: (kind: "armor" | "weapon", amountTenths?: number) => Promise<void>;
   startDemoRaid: () => Promise<void>;
   openDemoContainer: (containerIndex?: number, finalRandomValue?: number) => Promise<void>;
   fightDemoEnemy: () => Promise<void>;
   moveDemoArea: (area: "low" | "medium" | "high") => Promise<void>;
-  settleDemoRaid: (result: "succeeded" | "failed") => Promise<void>;
+  settleDemoRaid: (result: "succeeded" | "failed", raidSessionAddress?: string | null) => Promise<void>;
 }
 
 const WalletContext = createContext<WalletState | null>(null);
@@ -161,24 +161,20 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       battleRecordAccounts: recordAccounts,
       profile: profileAccount ? decodePlayerProfile(profileAccount, PROGRAM_ID) : null,
       battleRecords: recordAccounts.map((account) => decodeBattleRecord(account, PROGRAM_ID)),
-      convertDemoSol: (solAmount = 1n) => {
-        if (!walletAddress || solAmount <= 0n) return;
-        setProfileAccounts((current) => {
-          const profile = current[walletAddress];
-          if (!profile) return current;
-          return {
-            ...current,
-            [walletAddress]: {
-              ...profile,
-              data: {
-                ...profile.data,
-                edcoinsBalance: Number(profile.data.edcoinsBalance) + Number(solAmount * 10_000n),
-              },
-            },
-          };
-        });
+      convertDemoSol: async (solAmount = 1n) => {
+        if (!walletAddress) throw new Error("wallet-not-connected");
+        if (!walletProvider) throw new Error("browser-wallet-missing");
+        if (solAmount <= 0n) throw new Error("invalid-sol-amount");
+        await sendWalletTransactionWithError(
+          setWalletError,
+          setLastTransactionDebug,
+          "/api/tx/convert-sol",
+          walletAddress,
+          walletProvider,
+          { solLamports: Number(solAmount) },
+        );
       },
-      purchaseLoadoutPoints: async (kind) => {
+      purchaseLoadoutPoints: async (kind, amountTenths = 10) => {
         if (!walletAddress) throw new Error("wallet-not-connected");
         if (!walletProvider) throw new Error("browser-wallet-missing");
         await sendWalletTransactionWithError(
@@ -187,7 +183,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
           "/api/tx/purchase-loadout",
           walletAddress,
           walletProvider,
-          { kind },
+          { kind, amountTenths },
         );
       },
       startDemoRaid: async () => {
@@ -204,6 +200,17 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       },
       openDemoContainer: async (containerIndex = 0, finalRandomValue = 5) => {
         if (!walletAddress) throw new Error("wallet-not-connected");
+        if (walletProvider && (!sessionWallet.publicKey || !sessionWallet.sessionToken || !sessionWallet.signAndSendTransaction)) {
+          await sendWalletTransactionWithError(
+            setWalletError,
+            setLastTransactionDebug,
+            "/api/tx/open",
+            walletAddress,
+            walletProvider,
+            { containerIndex, finalRandomValue },
+          );
+          return;
+        }
         await sendSessionTransactionWithError(setWalletError, setLastTransactionDebug, sessionWallet, "/api/tx/open", walletAddress, {
           containerIndex,
           finalRandomValue,
@@ -211,13 +218,34 @@ export function WalletProvider({ children }: { children: ReactNode }) {
       },
       fightDemoEnemy: async () => {
         if (!walletAddress) throw new Error("wallet-not-connected");
+        if (walletProvider && (!sessionWallet.publicKey || !sessionWallet.sessionToken || !sessionWallet.signAndSendTransaction)) {
+          await sendWalletTransactionWithError(
+            setWalletError,
+            setLastTransactionDebug,
+            "/api/tx/fight",
+            walletAddress,
+            walletProvider,
+          );
+          return;
+        }
         await sendSessionTransactionWithError(setWalletError, setLastTransactionDebug, sessionWallet, "/api/tx/fight", walletAddress);
       },
       moveDemoArea: async (area) => {
         if (!walletAddress) throw new Error("wallet-not-connected");
+        if (walletProvider && (!sessionWallet.publicKey || !sessionWallet.sessionToken || !sessionWallet.signAndSendTransaction)) {
+          await sendWalletTransactionWithError(
+            setWalletError,
+            setLastTransactionDebug,
+            "/api/tx/move",
+            walletAddress,
+            walletProvider,
+            { area },
+          );
+          return;
+        }
         await sendSessionTransactionWithError(setWalletError, setLastTransactionDebug, sessionWallet, "/api/tx/move", walletAddress, { area });
       },
-      settleDemoRaid: async (result) => {
+      settleDemoRaid: async (result, raidSessionAddress) => {
         if (!walletAddress) throw new Error("wallet-not-connected");
         if (!walletProvider) throw new Error("browser-wallet-missing");
         await sendWalletTransactionWithError(
@@ -226,6 +254,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
           result === "succeeded" ? "/api/tx/extract" : "/api/tx/fail",
           walletAddress,
           walletProvider,
+          raidSessionAddress ? { raidSession: raidSessionAddress } : {},
         );
         await sessionWallet.revokeSession?.();
       },
@@ -295,6 +324,10 @@ async function sendWalletTransaction(
         skipPreflight: true,
       });
     } catch (error) {
+      if (isFetchTransportError(error) && provider.signAndSendTransaction) {
+        const walletResult = await provider.signAndSendTransaction(transaction);
+        signature = walletResult.signature;
+      } else
       if (isAlreadyProcessedError(error)) {
         const existingSignature = signedTransaction.signature;
         if (!existingSignature) {
@@ -509,6 +542,10 @@ function withTimeout<T>(promise: Promise<T>, message: string, ms = 3_000): Promi
 function isAlreadyProcessedError(error: unknown) {
   if (!(error instanceof Error)) return false;
   return error.message.includes("already been processed");
+}
+
+function isFetchTransportError(error: unknown) {
+  return error instanceof TypeError && error.message.includes("Failed to fetch");
 }
 
 function serializeError(error: unknown) {

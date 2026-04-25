@@ -41,6 +41,10 @@ select {
   font: inherit;
 }
 
+input {
+  color: inherit;
+}
+
 .shell {
   width: min(1120px, calc(100vw - 32px));
   margin: 0 auto;
@@ -121,7 +125,8 @@ p {
 .inventory-grid,
 .raid-grid,
 .record-grid,
-.market-grid {
+.market-grid,
+.loot-grid {
   display: grid;
   gap: 14px;
 }
@@ -143,6 +148,10 @@ p {
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
 }
 
+.loot-grid {
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
 .card,
 .stat-card,
 .record-card,
@@ -157,6 +166,31 @@ p {
 .record-card,
 .control-surface {
   padding: 18px;
+}
+
+.loot-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  background: rgba(11, 16, 12, 0.76);
+}
+
+.loot-card strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 1rem;
+}
+
+.loot-rare {
+  border-color: rgba(120, 214, 107, 0.4);
+}
+
+.loot-epic {
+  border-color: rgba(228, 195, 91, 0.55);
+}
+
+.loot-legendary {
+  border-color: rgba(240, 93, 79, 0.65);
 }
 
 .stat-card {
@@ -227,10 +261,24 @@ p {
   padding: 12px 14px;
 }
 
+.purchase-warning {
+  color: #ffd9d4;
+}
+
 .field-row {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
+}
+
+.text-input {
+  width: 100%;
+  min-height: 42px;
+  margin-top: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: rgba(11, 16, 12, 0.72);
+  padding: 10px 12px;
 }
 
 .mission-header {

@@ -1,6 +1,8 @@
 import { SOL_TO_EDCOINS_RATE } from "../../../clients/src/types";
 import { usePlayerProfile } from "../wallet/usePlayerProfile";
 
+const ONE_SOL_LAMPORTS = 1_000_000_000n;
+
 export function previewEdcoinsCredit(solAmount: bigint): bigint {
   if (solAmount <= 0n) return 0n;
   return solAmount * SOL_TO_EDCOINS_RATE;
@@ -27,7 +29,7 @@ export function EdcoinsConversionPanel({
         className="button"
         type="button"
         disabled={!player.connected}
-        onClick={() => player.convertDemoSol(1n)}
+        onClick={() => void player.convertDemoSol(ONE_SOL_LAMPORTS)}
       >
         {buttonLabel}
       </button>

@@ -5,6 +5,7 @@ const PROGRAM_ID = new anchor.web3.PublicKey(
   process.env.NEXT_PUBLIC_PROGRAM_ID ?? process.env.PROGRAM_ID ?? "7ueVgYfrwidjpwMCBfGyHCoVpaVNe7Ep1h2Mxv1ENBYQ",
 );
 const RPC_URL = process.env.ANCHOR_PROVIDER_URL ?? process.env.RPC_URL ?? "https://api.devnet.solana.com";
+const LAMPORTS_PER_SOL = 1_000_000_000;
 
 type ProgramAccountNamespace = {
   playerProfile: {
@@ -146,12 +147,16 @@ export async function buildStartRaidTransaction(player: string) {
   return finalizeTransaction(provider.connection, transaction, playerKey);
 }
 
-export async function buildPurchaseLoadoutPointsTransaction(player: string, kind: "armor" | "weapon") {
+export async function buildPurchaseLoadoutPointsTransaction(
+  player: string,
+  kind: "armor" | "weapon",
+  amountTenths = 10,
+) {
   const { provider, program, gameConfig } = await ensureLocalDemoSetup();
   const playerKey = new anchor.web3.PublicKey(player);
   const playerProfile = derivePlayerProfile(playerKey);
   const transaction = await program.methods
-    .purchaseLoadoutPoints(kind === "armor" ? { armor: {} } : { weapon: {} })
+    .purchaseLoadoutPoints(kind === "armor" ? { armor: {} } : { weapon: {} }, amountTenths)
     .accounts({
       gameConfig,
       playerProfile,
@@ -161,17 +166,32 @@ export async function buildPurchaseLoadoutPointsTransaction(player: string, kind
   return finalizeTransaction(provider.connection, transaction, playerKey);
 }
 
-export async function buildSettlementTransaction(player: string, result: "succeeded" | "failed") {
-  const { provider, program } = await ensureLocalDemoSetup();
+export async function buildConvertSolToEdcoinsTransaction(player: string, solLamports = LAMPORTS_PER_SOL) {
+  const { provider, program, gameConfig, wallet } = await ensureLocalDemoSetup();
   const playerKey = new anchor.web3.PublicKey(player);
   const playerProfile = derivePlayerProfile(playerKey);
-  const playerAccount = await accounts(program).playerProfile.fetchNullable(playerProfile);
-  if (!playerAccount?.activeRaid) {
-    throw new Error("no-active-raid");
-  }
+  const transaction = await program.methods
+    .convertSolToEdcoins(new anchor.BN(solLamports))
+    .accounts({
+      gameConfig,
+      playerProfile,
+      player: playerKey,
+      solTreasury: wallet,
+      systemProgram: anchor.web3.SystemProgram.programId,
+    })
+    .transaction();
+  return finalizeTransaction(provider.connection, transaction, playerKey);
+}
 
-  const raidSessionAddress = new anchor.web3.PublicKey(playerAccount.activeRaid);
-  const raidSession = await accounts(program).raidSession.fetch(raidSessionAddress);
+export async function buildSettlementTransaction(
+  player: string,
+  result: "succeeded" | "failed",
+  raidSessionOverride?: string,
+) {
+  const { provider, program } = await ensureLocalDemoSetup();
+  const { playerKey, playerProfile, raidSessionAddress, raidSession } = raidSessionOverride
+    ? await getExplicitRaid(program, player, raidSessionOverride)
+    : await getActiveRaid(program, player);
   const battleRecord = deriveBattleRecord(playerProfile, Number(raidSession.raidId.toString()));
   const builder =
     result === "succeeded"
@@ -482,13 +502,35 @@ function deriveBattleRecord(playerProfile: anchor.web3.PublicKey, raidId: number
 async function getActiveRaid(program: anchor.Program, player: string) {
   const playerKey = new anchor.web3.PublicKey(player);
   const playerProfile = derivePlayerProfile(playerKey);
-  const playerAccount = await accounts(program).playerProfile.fetchNullable(playerProfile);
-  if (!playerAccount?.activeRaid) {
-    throw new Error("no-active-raid");
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    const playerAccount = await accounts(program).playerProfile.fetchNullable(playerProfile);
+    if (playerAccount?.activeRaid) {
+      const raidSessionAddress = new anchor.web3.PublicKey(playerAccount.activeRaid);
+      const raidSession = await accounts(program).raidSession.fetch(raidSessionAddress);
+      return { playerKey, playerProfile, raidSessionAddress, raidSession };
+    }
+
+    const nextRaidId = Number(playerAccount?.nextRaidId?.toString?.() ?? "0");
+    if (nextRaidId > 0) {
+      const inferredRaidSessionAddress = deriveRaidSession(playerProfile, nextRaidId - 1);
+      if (await accountExists(program.provider.connection, inferredRaidSessionAddress)) {
+        const raidSession = await accounts(program).raidSession.fetch(inferredRaidSessionAddress);
+        return { playerKey, playerProfile, raidSessionAddress: inferredRaidSessionAddress, raidSession };
+      }
+    }
+
+    await sleep(500);
   }
-  const raidSessionAddress = new anchor.web3.PublicKey(playerAccount.activeRaid);
-  const raidSession = await accounts(program).raidSession.fetch(raidSessionAddress);
-  return { playerKey, playerProfile, raidSessionAddress, raidSession };
+
+  throw new Error("no-active-raid");
+}
+
+async function getExplicitRaid(program: anchor.Program, player: string, raidSessionAddress: string) {
+  const playerKey = new anchor.web3.PublicKey(player);
+  const playerProfile = derivePlayerProfile(playerKey);
+  const raidSessionKey = new anchor.web3.PublicKey(raidSessionAddress);
+  const raidSession = await accounts(program).raidSession.fetch(raidSessionKey);
+  return { playerKey, playerProfile, raidSessionAddress: raidSessionKey, raidSession };
 }
 
 function riskLevelArg(area: "low" | "medium" | "high") {

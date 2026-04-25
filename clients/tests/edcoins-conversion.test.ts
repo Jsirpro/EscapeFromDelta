@@ -12,7 +12,7 @@ describe("SOL to EDcoins transaction builder", () => {
       solAmount: 2n,
     });
 
-    expect(summary.amounts).toContainEqual({ label: "EDcoins credit", value: "20000" });
+    expect(summary.amounts).toContainEqual({ label: "EDcoins credit", value: "20000000" });
     expect(summary.simulation.error).toBe("simulation-required-before-wallet-approval");
   });
 });

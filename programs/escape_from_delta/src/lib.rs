@@ -109,8 +109,9 @@ pub mod escape_from_delta {
     pub fn purchase_loadout_points(
         ctx: Context<PurchaseLoadoutPoints>,
         kind: LoadoutPointKind,
+        amount_tenths: u16,
     ) -> Result<()> {
-        instructions::purchase_loadout_points::handler(ctx, kind)
+        instructions::purchase_loadout_points::handler_with_amount(ctx, kind, amount_tenths)
     }
 
     pub fn cancel_listing(ctx: Context<CancelListing>) -> Result<()> {
