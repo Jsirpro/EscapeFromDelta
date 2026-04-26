@@ -11,7 +11,7 @@ import { decodePlayerProfile } from "../../../clients/src/queries/player";
 import type { BattleRecord, PlayerProfile } from "../../../clients/src/types";
 
 const PROGRAM_ID =
-  process.env.NEXT_PUBLIC_PROGRAM_ID ?? process.env.PROGRAM_ID ?? "7ueVgYfrwidjpwMCBfGyHCoVpaVNe7Ep1h2Mxv1ENBYQ";
+  process.env.NEXT_PUBLIC_PROGRAM_ID ?? process.env.PROGRAM_ID ?? "Ec3cfCCBS14yGkpHGNFTZjbvjFVfCMTfg5zsSECCS6yf";
 const RPC_URL = process.env.NEXT_PUBLIC_RPC_URL ?? "https://api.devnet.solana.com";
 const SOLANA_CLUSTER =
   (process.env.NEXT_PUBLIC_SOLANA_CLUSTER as "devnet" | "localnet" | undefined) ?? "devnet";

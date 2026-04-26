@@ -2,9 +2,9 @@ import * as anchor from "@coral-xyz/anchor";
 import idl from "../../../target/idl/escape_from_delta.json";
 
 const PROGRAM_ID = new anchor.web3.PublicKey(
-  process.env.NEXT_PUBLIC_PROGRAM_ID ?? process.env.PROGRAM_ID ?? "7ueVgYfrwidjpwMCBfGyHCoVpaVNe7Ep1h2Mxv1ENBYQ",
+  process.env.NEXT_PUBLIC_PROGRAM_ID ?? process.env.PROGRAM_ID ?? "Ec3cfCCBS14yGkpHGNFTZjbvjFVfCMTfg5zsSECCS6yf",
 );
-const RPC_URL = process.env.ANCHOR_PROVIDER_URL ?? process.env.RPC_URL ?? "https://api.devnet.solana.com";
+const RPC_URL = process.env.ANCHOR_PROVIDER_URL ?? process.env.NEXT_PUBLIC_RPC_URL ?? process.env.RPC_URL ?? "https://api.devnet.solana.com";
 const LAMPORTS_PER_SOL = 1_000_000_000;
 const DEFAULT_SAFE_CASE_CAPACITY = 0;
 
@@ -113,6 +113,20 @@ export async function buildCreateOrConnectPlayerTransaction(player: string) {
   const { provider, program, gameConfig } = await ensureLocalDemoSetup({ includeServerPlayer: false });
   const playerKey = new anchor.web3.PublicKey(player);
   const playerProfile = derivePlayerProfile(playerKey);
+
+  // Airdrop some SOL to the player from server wallet if they are low (Local Demo Only)
+  const playerBalance = await provider.connection.getBalance(playerKey, "processed");
+  if (playerBalance < 2 * LAMPORTS_PER_SOL) {
+    const transferIx = anchor.web3.SystemProgram.transfer({
+      fromPubkey: provider.wallet.publicKey,
+      toPubkey: playerKey,
+      lamports: 10 * LAMPORTS_PER_SOL,
+    });
+    const transferTx = new anchor.web3.Transaction().add(transferIx);
+    await sendServerTransaction(provider, transferTx);
+    console.log(`[local-demo] Airdropped 10 SOL to ${player}`);
+  }
+
   const transaction = await program.methods
     .createOrConnectPlayer()
     .accounts({
@@ -475,18 +489,35 @@ async function waitForSignatureStatus(
   signature: string,
   lastValidBlockHeight: number,
 ) {
-  while ((await connection.getBlockHeight("confirmed")) <= lastValidBlockHeight) {
+  const startSlot = await connection.getSlot("processed");
+  
+  // Poll for status until the blockhash expires
+  while (true) {
     const response = await connection.getSignatureStatuses([signature]);
     const status = response.value[0];
-    if (status?.err) {
-      throw new Error(`transaction-failed:${JSON.stringify(status.err)}`);
+
+    if (status) {
+      if (status.err) {
+        throw new Error(`transaction-failed:${JSON.stringify(status.err)}`);
+      }
+      if (status.confirmationStatus === "confirmed" || status.confirmationStatus === "finalized") {
+        return;
+      }
     }
-    if (status?.confirmationStatus === "confirmed" || status?.confirmationStatus === "finalized") {
-      return;
+
+    const currentHeight = await connection.getBlockHeight("processed");
+    if (currentHeight > lastValidBlockHeight) {
+      // One last check before giving up
+      const finalCheck = await connection.getSignatureStatuses([signature]);
+      if (finalCheck.value[0]?.confirmationStatus === "confirmed" || finalCheck.value[0]?.confirmationStatus === "finalized") {
+        return;
+      }
+      throw new Error("transaction-confirmation-timeout");
     }
-    await sleep(400);
+
+    // Don't spam too hard, but keep it responsive for localnet
+    await sleep(500);
   }
-  throw new Error("transaction-confirmation-timeout");
 }
 
 function sleep(ms: number) {

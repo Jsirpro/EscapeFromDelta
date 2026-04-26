@@ -8,7 +8,7 @@ pub use errors::*;
 pub use instructions::*;
 pub use state::*;
 
-declare_id!("7ueVgYfrwidjpwMCBfGyHCoVpaVNe7Ep1h2Mxv1ENBYQ");
+declare_id!("Ec3cfCCBS14yGkpHGNFTZjbvjFVfCMTfg5zsSECCS6yf");
 
 #[program]
 pub mod escape_from_delta {

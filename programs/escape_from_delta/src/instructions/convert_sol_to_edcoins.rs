@@ -1,5 +1,5 @@
 use anchor_lang::prelude::*;
-use anchor_lang::solana_program::native_token::LAMPORTS_PER_SOL;
+const LAMPORTS_PER_SOL: u64 = 1_000_000_000;
 
 use crate::errors::EscapeError;
 use crate::state::constants::*;

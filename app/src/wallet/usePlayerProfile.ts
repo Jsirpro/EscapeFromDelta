@@ -32,7 +32,7 @@ export function usePlayerProfile() {
     () => new Connection(process.env.NEXT_PUBLIC_RPC_URL ?? "https://api.devnet.solana.com", "confirmed"),
     [],
   );
-  const programId = process.env.NEXT_PUBLIC_PROGRAM_ID ?? process.env.PROGRAM_ID ?? "7ueVgYfrwidjpwMCBfGyHCoVpaVNe7Ep1h2Mxv1ENBYQ";
+  const programId = process.env.NEXT_PUBLIC_PROGRAM_ID ?? process.env.PROGRAM_ID ?? "Ec3cfCCBS14yGkpHGNFTZjbvjFVfCMTfg5zsSECCS6yf";
 
   const refreshRemote = async () => {
     if (!wallet.connected || !wallet.walletAddress) {

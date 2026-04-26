@@ -1,7 +1,8 @@
 import * as anchor from "@coral-xyz/anchor";
+import BN from "bn.js";
 import idl from "../../target/idl/escape_from_delta.json";
 
-const PROGRAM_ID = new anchor.web3.PublicKey(process.env.PROGRAM_ID ?? "7ueVgYfrwidjpwMCBfGyHCoVpaVNe7Ep1h2Mxv1ENBYQ");
+const PROGRAM_ID = new anchor.web3.PublicKey(process.env.PROGRAM_ID ?? "Ec3cfCCBS14yGkpHGNFTZjbvjFVfCMTfg5zsSECCS6yf");
 const RPC_URL = process.env.ANCHOR_PROVIDER_URL ?? process.env.RPC_URL ?? "http://127.0.0.1:8899";
 
 async function main() {
@@ -62,7 +63,7 @@ async function main() {
   const [difficultyConfiguration] = anchor.web3.PublicKey.findProgramAddressSync(difficultySeeds, PROGRAM_ID);
   if (!(await accountExists(provider.connection, difficultyConfiguration))) {
     await program.methods
-      .createDifficultyVersion(new anchor.BN(1000), 10, 30, 50)
+      .createDifficultyVersion(new BN(1000), 10, 30, 50)
       .accounts({
         gameConfig,
         adminProfile,
@@ -75,7 +76,7 @@ async function main() {
   }
 
   const player = await program.account.playerProfile.fetch(playerProfile);
-  const nextRaidId = new anchor.BN(player.nextRaidId.toString());
+  const nextRaidId = new BN(player.nextRaidId.toString());
   const [raidSession] = anchor.web3.PublicKey.findProgramAddressSync(
     [Buffer.from("raid"), playerProfile.toBuffer(), u64(Number(nextRaidId.toString()))],
     PROGRAM_ID,
@@ -86,7 +87,7 @@ async function main() {
   );
 
   await program.methods
-    .startRaid(20, 20, new anchor.BN(1000))
+    .startRaid(20, 20, new BN(1000))
     .accounts({
       player: wallet,
       playerProfile,

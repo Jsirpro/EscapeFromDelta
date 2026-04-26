@@ -11,7 +11,7 @@
     "demo:local": "tsx scripts/run-local-demo.ts"
   },
   "dependencies": {
-    "@coral-xyz/anchor": "^0.30.1",
+    "@coral-xyz/anchor": "^0.32.1",
     "@solana/kit": "^2.0.0"
   },
   "devDependencies": {
