@@ -17,6 +17,7 @@ export default function PlayPage() {
   const [state, dispatch] = useReducer(raidReducer, initialRaidUiState);
   const player = usePlayerProfile();
   const { t } = useI18n();
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const [actionError, setActionError] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<null | "start" | "open" | "move" | "fight" | "extract" | "abandon" | "buy-armor" | "buy-weapon">(null);
   const [hasLocalActiveRaid, setHasLocalActiveRaid] = useState(false);
@@ -29,6 +30,7 @@ export default function PlayPage() {
   const showResumePrompt = hasActiveRaid && (state.status === "preparing" || state.status === "transitioning");
   const startArmorCost = 2.0;
   const startWeaponCost = 2.0;
+  const raidTimeoutSeconds = 300;
   const safeCaseUnitPrice = 500;
   const safeCasePrice = safeCaseCapacity * safeCaseUnitPrice;
   const totalStartEdcoinsCost = 1000 + safeCasePrice;
@@ -41,6 +43,15 @@ export default function PlayPage() {
     player.armorPointBalance < startArmorCost ||
     player.weaponPointBalance < startWeaponCost ||
     BigInt(totalStartEdcoinsCost) > player.edcoinsBalance;
+  const timeoutRemainingSeconds =
+    player.onChainRaidStartedAt && hasActiveRaid
+      ? Math.max(0, raidTimeoutSeconds - Math.floor(nowMs / 1000 - player.onChainRaidStartedAt))
+      : null;
+  const showTimeoutWarning =
+    timeoutRemainingSeconds !== null &&
+    timeoutRemainingSeconds > 0 &&
+    timeoutRemainingSeconds <= 30 &&
+    (state.status === "active" || state.status === "pending_battle");
 
   const raidStatusLabel = useMemo(() => {
     if (busyAction === "start") return t.play.deploying;
@@ -65,6 +76,16 @@ export default function PlayPage() {
     setSafeCaseCapacity(0);
     dispatch({ type: "reset" });
   }, [player.walletAddress]);
+
+  useEffect(() => {
+    if (!hasActiveRaid || !player.onChainRaidStartedAt) {
+      return;
+    }
+    const timer = window.setInterval(() => {
+      setNowMs(Date.now());
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [hasActiveRaid, player.onChainRaidStartedAt]);
 
   useEffect(() => {
     if (player.onChainActiveRaid) {
@@ -385,6 +406,11 @@ export default function PlayPage() {
           </div>
 
           {actionError ? <div className="alert">{formatPlayError(actionError, t)}</div> : null}
+          {showTimeoutWarning ? (
+            <div className="alert">
+              {t.play.timeoutWarning.replace("{seconds}", String(timeoutRemainingSeconds))}
+            </div>
+          ) : null}
 
           {player.lastTransactionDebug ? (
             <details>

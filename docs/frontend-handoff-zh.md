@@ -75,6 +75,11 @@
 - 护甲 `2.0`
 - 武器 `2.0`
 - 入场费 `1000 EDcoins`
+- 另外叠加安全箱费用：
+  - `0` 格：`0 EDcoins`
+  - `1` 格：`500 EDcoins`
+  - `2` 格：`1000 EDcoins`
+  - `3` 格：`1500 EDcoins`
 
 也就是链上实际传：
 
@@ -95,8 +100,11 @@
 
 ### 3.1 当前价格
 
-- 每次购买 `+1.0 armor-point balance`，花费 `1000 EDcoins`
-- 每次购买 `+1.0 weapon-point balance`，花费 `1000 EDcoins`
+- 当前不是固定 `+1.0`
+- 前端可输入购买多少参数，支持 `0.1` 步进
+- 价格规则是：
+  - `1000 EDcoins / 1.0 armor-point balance`
+  - `1000 EDcoins / 1.0 weapon-point balance`
 
 链上常量位置：
 
@@ -118,10 +126,12 @@
 
 ### 3.3 当前前端入口
 
-`/play` 页面已有两个按钮：
+`/play` 页面当前是两个输入框加两个按钮：
 
-- 购买 `+1.0 护甲`
-- 购买 `+1.0 武器`
+- `购买护甲参数`
+- `购买武器参数`
+
+前端会实时显示本次购买价格，并在 `EDcoins` 不足时禁用按钮。
 
 页面位置：
 
@@ -159,6 +169,9 @@ API 路由：
 - 创建 `RaidSession`
 - `PlayerProfile.active_raid` 指向当前 raid
 
+当前开局不再等服务端确认 `activeRaid` 再切 UI。  
+`start_raid` 交易成功后，`/play` 会直接进入局内状态，再异步刷新链上状态。
+
 ### 4.3 局内动作
 
 当前局内动作包括：
@@ -166,15 +179,41 @@ API 路由：
 - `open_container`
 - `fight_enemy`
 - `move_area`
+- `select_safe_case_items`
 - `extract_raid`
 - `settle_failed_raid`
 
 其中：
 
-- `open_container / fight_enemy / move_area` 设计上支持 session key
+- `open_container / fight_enemy / move_area / select_safe_case_items` 当前只走 session key
 - `extract_raid / settle_failed_raid` 仍走玩家钱包签名
+- 如果 session token 无效，前端会报 session 相关错误，不再回退到钱包直签局内动作
 
-### 4.4 主动放弃战局
+### 4.4 当前测试模式
+
+当前代码为了方便测试，链上常量被改成：
+
+- `100%` 遇敌
+- `100%` 战斗胜利
+
+只对**新开的 raid**生效。旧战局不会自动切换到这个测试模式。
+
+### 4.5 当前容器掉落时序
+
+现在的掉落逻辑是：
+
+1. `open_container`
+2. 如果不遇敌，直接把物品写入 `carried_loot`
+3. 如果遇敌，先把本次掉落挂到 `pending_loot`
+4. `fight_enemy` 胜利后，再把 `pending_loot` 写入 `carried_loot`
+5. 失败则拿不到这次容器物品
+
+对应文件：
+
+- [open_container.rs](/home/solana/programs/EscapeFromDelta/programs/escape_from_delta/src/instructions/open_container.rs)
+- [fight_enemy.rs](/home/solana/programs/EscapeFromDelta/programs/escape_from_delta/src/instructions/fight_enemy.rs)
+
+### 4.6 主动放弃战局
 
 现在“放弃战局”走的是：
 
@@ -188,11 +227,74 @@ API 路由：
 - `TimedOut`
 - 或超时
 
+当前 `/play` 页里的“放弃战局”不再走 `/api/tx/fail`，而是浏览器端直接构造 `settle_failed_raid` 交易并钱包签名发送。  
+这样做是为了绕开 Next dev server 在 `/api/tx/fail` 路径上的 OOM 问题。
+
 文件：
 
 - [settle_failed_raid.rs](/home/solana/programs/EscapeFromDelta/programs/escape_from_delta/src/instructions/settle_failed_raid.rs)
+- [provider.tsx](/home/solana/programs/EscapeFromDelta/app/src/wallet/provider.tsx)
 
-## 5. 交易系统业务逻辑
+## 5. 安全箱逻辑
+
+### 5.1 当前开局选择
+
+开局前可以选择：
+
+- 不购买
+- `1` 格
+- `2` 格
+- `3` 格
+
+前端位置：
+
+- [SafeCaseSelection.tsx](/home/solana/programs/EscapeFromDelta/app/src/game/SafeCaseSelection.tsx)
+- [page.tsx](/home/solana/programs/EscapeFromDelta/app/src/app/play/page.tsx)
+
+### 5.2 当前保留机制
+
+当前已经不是自动保留最早掉落的前 N 件。  
+现在是：
+
+1. 你先购买安全箱容量
+2. 局内获得 loot 后
+3. 逐件点击：
+   - `放入安全箱`
+   - `移出安全箱`
+4. 失败结算时，只保留 `safe_case_selection` 里的物品
+
+对应链上指令：
+
+- `select_safe_case_items(selected_assets, capacity)`
+
+对应文件：
+
+- [select_safe_case_items.rs](/home/solana/programs/EscapeFromDelta/programs/escape_from_delta/src/instructions/select_safe_case_items.rs)
+- [route.ts](/home/solana/programs/EscapeFromDelta/app/src/app/api/tx/safe-case/route.ts)
+
+## 6. 前端当前读取方式
+
+### 6.1 `/play` 页
+
+`/play` 当前已经不再通过 Next API route 读取 `PlayerProfile / RaidSession`。
+
+现在是浏览器端直接用 RPC 读取：
+
+- `PlayerProfile`
+- 当前 `RaidSession`
+
+文件：
+
+- [onchain.ts](/home/solana/programs/EscapeFromDelta/app/src/lib/onchain.ts)
+- [usePlayerProfile.ts](/home/solana/programs/EscapeFromDelta/app/src/wallet/usePlayerProfile.ts)
+
+这样做是为了绕开 Next dev server 在服务端读链路上的 OOM。
+
+### 6.2 `/records` 与 `/warehouse`
+
+战绩和仓库仍然会使用 records 数据源，仓库当前是从 battle records 的 `retainedAssets` 聚合展示收藏品。
+
+## 7. 交易系统业务逻辑
 
 ### 5.1 当前支持卖出的内容
 
@@ -231,7 +333,7 @@ API 路由：
 
 - [purchase_listing.rs](/home/solana/programs/EscapeFromDelta/programs/escape_from_delta/src/instructions/purchase_listing.rs)
 
-## 6. 重要链上账户
+## 8. 重要链上账户
 
 前端最需要关注的账户有 5 个：
 
@@ -327,17 +429,18 @@ API 路由：
 
 ### 8.1 当前模式
 
-当前项目不是页面直接拼 Anchor tx，而是：
+当前项目已经不是单一的“全都走 Next API 构造交易”模式，而是混合模式：
 
-1. 页面请求 Next API
+1. 大部分交易仍然是页面请求 Next API
 2. API 在服务端构造 unsigned transaction
-3. 前端钱包签名发送
+3. 前端钱包或 session key 负责签名发送
+4. `/play` 的链上状态读取，以及失败结算交易，已经改成浏览器端直连 RPC / 浏览器端直构交易
 
-这样做的好处是：
+这样做的原因是：
 
-- 页面更轻
-- PDA 推导集中在服务端
-- 方便插入 demo 逻辑和调试输出
+- `/play` 高频读链时，Next dev server 曾在服务端读链路上 OOM
+- `PlayerProfile / RaidSession` 放到浏览器端直读更稳
+- `settle_failed_raid` 放到浏览器端直构可以绕开 `/api/tx/fail` 的高压路径
 
 ### 8.2 现有交易 API
 
@@ -350,12 +453,19 @@ API 路由：
 - `/api/tx/move`
 - `/api/tx/extract`
 - `/api/tx/fail`
+- `/api/tx/safe-case`
 - `/api/tx/purchase-loadout`
 
 可读取：
 
 - `/api/player/[wallet]`
 - `/api/records/[wallet]`
+
+但要注意：
+
+- `/play` 当前已经**不再依赖** `/api/player/[wallet]`
+- `/play` 的失败结算当前也**不再依赖** `/api/tx/fail`
+- 这两个接口仍然保留，更多是给其它页面、调试、或后续重构使用
 
 ### 8.3 服务端交易构造入口
 

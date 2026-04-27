@@ -13,7 +13,10 @@
 ## 1. 基础信息
 
 - Program ID：`7ueVgYfrwidjpwMCBfGyHCoVpaVNe7Ep1h2Mxv1ENBYQ`
-- 当前模式：前端请求 Next API，服务端构造 unsigned transaction，钱包负责签名发送
+- 当前模式：混合模式
+  - 大部分交易：前端请求 Next API，服务端构造 unsigned transaction，钱包或 session key 负责签名发送
+  - `/play` 的 `PlayerProfile / RaidSession` 读取：浏览器端直接 RPC
+  - `/play` 的失败结算：浏览器端直接构造 `settle_failed_raid`，不再依赖 `/api/tx/fail`
 
 合约入口：
 
@@ -92,6 +95,7 @@
 - `edcoinsBalance / warehouseNonce / nextRaidId` 用字符串返回
 - `armorPointBalance / weaponPointBalance` 是 tenths
 - `activeRaid != null` 说明链上有未结算战局
+- 当前 `/play` 已经不再依赖这个接口；它主要保留给其它页面和调试使用
 
 ### 3.2 查询战绩
 
@@ -121,6 +125,12 @@
   ]
 }
 ```
+
+#### 说明
+
+- 当前默认上限是 `50`
+- `/play` 不再轮询这个接口
+- `/records` 和 `/warehouse` 仍然会使用它
 
 ## 4. 交易接口
 
@@ -163,17 +173,20 @@
 
 ```json
 {
-  "player": "<wallet-pubkey>"
+  "player": "<wallet-pubkey>",
+  "safeCaseCapacity": 0
 }
 ```
 
-#### 当前固定参数
+#### 当前固定参数 / 组合
 
 当前服务端固定写死：
 
 - armor `2.0`
 - weapon `2.0`
 - entry fee `1000 EDcoins`
+- safe case capacity 由前端显式传 `0 | 1 | 2 | 3`
+- safe case 价格当前是 `500 EDcoins / 格`
 
 对应代码：
 
@@ -181,7 +194,7 @@
 
 #### 对应合约指令
 
-- `start_raid(armor_tenths, weapon_tenths, entry_fee)`
+- `start_raid(armor_tenths, weapon_tenths, entry_fee, safe_case_capacity)`
 
 #### 常见错误
 
@@ -201,17 +214,7 @@
 
 #### 请求
 
-钱包直签路径：
-
-```json
-{
-  "player": "<wallet-pubkey>",
-  "containerIndex": 0,
-  "finalRandomValue": 5
-}
-```
-
-session key 路径：
+当前实际使用的是 session 路径，请求示例：
 
 ```json
 {
@@ -231,6 +234,9 @@ session key 路径：
 
 - `base / same_area_steps / area_changes` 当前服务端都传 `0`
 - `finalRandomValue` 目前是 demo 随机/固定值，不是生产级随机方案
+- 当前测试模式下，新开的 raid 是 `100%` 遇敌
+- 如果遇敌，这次容器 loot 会先进入 `pending_loot`
+- 只有 `fight_enemy` 胜利后，这次 loot 才真正进入 `carried_loot`
 
 ---
 
@@ -244,15 +250,7 @@ session key 路径：
 
 #### 请求
 
-钱包路径：
-
-```json
-{
-  "player": "<wallet-pubkey>"
-}
-```
-
-session 路径：
+当前实际使用的是 session 路径：
 
 ```json
 {
@@ -270,6 +268,8 @@ session 路径：
 
 这些参数当前由服务端根据链上 `RaidSession` 填入，不需要前端自己组装。
 
+当前测试模式下，新开的 raid 是 `100%` 战斗胜利。
+
 ---
 
 ### 4.5 切换区域
@@ -285,14 +285,7 @@ session 路径：
 ```json
 {
   "player": "<wallet-pubkey>",
-  "area": "low" | "medium" | "high"
-}
-```
-
-如果使用 session key，还要带：
-
-```json
-{
+  "area": "low" | "medium" | "high",
   "sessionSigner": "<session-pubkey>",
   "sessionToken": "<session-token-pubkey>"
 }
@@ -348,7 +341,8 @@ session 路径：
 
 ```json
 {
-  "player": "<wallet-pubkey>"
+  "player": "<wallet-pubkey>",
+  "raidSession": "<raid-session-pubkey>"
 }
 ```
 
@@ -361,6 +355,12 @@ session 路径：
 - 超时失败
 - 战斗失败后结算
 - 主动放弃战局
+
+#### 当前真实使用边界
+
+- 这个接口仍然存在
+- 但 `/play` 当前的“放弃战局”已经不再调用它
+- `/play` 会在浏览器端直接构造 `settle_failed_raid` 交易，`Transaction Debug.path` 会显示为 `client/tx/fail`
 
 ---
 
@@ -377,18 +377,54 @@ session 路径：
 ```json
 {
   "player": "<wallet-pubkey>",
-  "kind": "armor" | "weapon"
+  "kind": "armor" | "weapon",
+  "amountTenths": 10
 }
 ```
 
 #### 对应合约指令
 
-- `purchase_loadout_points(kind)`
+- `purchase_loadout_points(kind, amount_tenths)`
 
 #### 当前规则
 
-- `armor`：花 `1000 EDcoins`，买 `+1.0 armor-point balance`
-- `weapon`：花 `1000 EDcoins`，买 `+1.0 weapon-point balance`
+- `1000 EDcoins / 1.0`
+- 前端按 `0.1` 步进传 `amountTenths`
+- 例如：
+  - `amountTenths = 5` -> 购买 `0.5`
+  - `amountTenths = 23` -> 购买 `2.3`
+
+---
+
+### 4.9 手动安全箱选择
+
+**POST** `/api/tx/safe-case`
+
+文件：
+
+- [route.ts](/home/solana/programs/EscapeFromDelta/app/src/app/api/tx/safe-case/route.ts)
+
+#### 请求
+
+```json
+{
+  "player": "<wallet-pubkey>",
+  "sessionSigner": "<session-pubkey>",
+  "sessionToken": "<session-token-pubkey>",
+  "selectedAssets": ["<loot-pubkey-1>", "<loot-pubkey-2>"],
+  "capacity": 2
+}
+```
+
+#### 对应合约指令
+
+- `select_safe_case_items(selected_assets, capacity)`
+
+#### 说明
+
+- 当前已经不是自动保留最早掉落的前 N 件
+- 玩家要在局内手动把 loot 放入 / 移出安全箱
+- `selectedAssets.length` 不能超过当前安全箱容量
 
 ## 5. 合约指令总览
 
@@ -403,6 +439,7 @@ session 路径：
 - `open_container`
 - `fight_enemy`
 - `move_area`
+- `select_safe_case_items`
 - `extract_raid`
 - `settle_failed_raid`
 
@@ -468,6 +505,13 @@ session 路径：
 - 容器索引错误
 - 或该区域容器已经开完
 
+### 3012 `AccountNotInitialized`
+
+含义：
+
+- 当前多出现在 session token 无效
+- 或 session token 链上账户不存在 / 不可用
+
 ### 6013 `InvalidDifficultyConfig`
 
 含义：
@@ -481,7 +525,7 @@ session 路径：
 依赖：
 
 - 钱包连接
-- `/api/player/[wallet]`
+- 浏览器端直连 RPC 读取 `PlayerProfile`
 
 建议展示：
 
@@ -493,15 +537,19 @@ session 路径：
 
 依赖：
 
-- `/api/player/[wallet]`
-- `/api/records/[wallet]`
+- 浏览器端直连 RPC 读取 `PlayerProfile / RaidSession`
 - `/api/tx/start`
 - `/api/tx/open`
 - `/api/tx/fight`
 - `/api/tx/move`
+- `/api/tx/safe-case`
 - `/api/tx/extract`
-- `/api/tx/fail`
 - `/api/tx/purchase-loadout`
+
+补充：
+
+- `/play` 的失败结算不再走 `/api/tx/fail`
+- `/play` 的 records 也不再做高频轮询
 
 ### `/warehouse`
 
@@ -528,8 +576,9 @@ session 路径：
 
 当前项目的设计边界：
 
-- `connect / start / extract / fail / purchase-loadout`：仍走钱包签名
-- `open / fight / move`：支持 session key
+- `connect / start / extract / purchase-loadout`：钱包签名
+- `open / fight / move / safe-case`：session key
+- `fail`：`/play` 当前是浏览器端直接构造交易，再由钱包签名
 
 也就是说：
 
@@ -567,6 +616,7 @@ session 路径：
 - Open：[route.ts](/home/solana/programs/EscapeFromDelta/app/src/app/api/tx/open/route.ts)
 - Fight：[route.ts](/home/solana/programs/EscapeFromDelta/app/src/app/api/tx/fight/route.ts)
 - Move：[route.ts](/home/solana/programs/EscapeFromDelta/app/src/app/api/tx/move/route.ts)
+- Safe Case：[route.ts](/home/solana/programs/EscapeFromDelta/app/src/app/api/tx/safe-case/route.ts)
 - Extract：[route.ts](/home/solana/programs/EscapeFromDelta/app/src/app/api/tx/extract/route.ts)
 - Fail：[route.ts](/home/solana/programs/EscapeFromDelta/app/src/app/api/tx/fail/route.ts)
 - Purchase Loadout：[route.ts](/home/solana/programs/EscapeFromDelta/app/src/app/api/tx/purchase-loadout/route.ts)

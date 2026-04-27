@@ -11,6 +11,7 @@ export interface BrowserRaidState {
   safeCaseCapacity: number;
   safeCaseItems: string[];
   lootItems: LootDisplayItem[];
+  startedAt: number;
 }
 
 class ByteReader {
@@ -145,12 +146,31 @@ function decodeRaidState(bytes: Uint8Array, hasPendingLoot: boolean): BrowserRai
   const carriedLootLength = reader.readU32();
   if (carriedLootLength > 64) throw new Error("invalid-carried-loot-length");
   const carriedLoot = Array.from({ length: carriedLootLength }, () => reader.readPubkey());
+  const randomEventsLength = reader.readU32();
+  if (randomEventsLength > 128) throw new Error("invalid-random-events-length");
+  for (let index = 0; index < randomEventsLength; index += 1) {
+    reader.readU64();
+    reader.readU8();
+    reader.readU64();
+    reader.readU16();
+    reader.readU8();
+    reader.readI64();
+  }
+  const startedAt = Number(reader.readI64());
+  reader.readU8();
+  if (bytes.length > 0) {
+    // settled_at when present
+    if (reader.readBool()) {
+      reader.readI64();
+    }
+  }
   return {
     status,
     currentArea,
     safeCaseCapacity,
     safeCaseItems,
     lootItems: carriedLoot.map(deriveCollectibleDisplay),
+    startedAt,
   };
 }
 

@@ -49,6 +49,7 @@ interface WalletState {
   battleRecords: BattleRecord[];
   convertDemoSol: (solAmount?: bigint) => Promise<void>;
   purchaseLoadoutPoints: (kind: "armor" | "weapon", amountTenths?: number) => Promise<void>;
+  createMarketplaceListing: (warehouseAsset: string, priceEdcoins: number) => Promise<void>;
   startDemoRaid: (safeCaseCapacity?: number) => Promise<void>;
   openDemoContainer: (containerIndex?: number, finalRandomValue?: number) => Promise<void>;
   fightDemoEnemy: () => Promise<void>;
@@ -195,6 +196,18 @@ export function WalletProvider({ children }: { children: ReactNode }) {
           walletAddress,
           walletProvider,
           { kind, amountTenths },
+        );
+      },
+      createMarketplaceListing: async (warehouseAsset, priceEdcoins) => {
+        if (!walletAddress) throw new Error("wallet-not-connected");
+        if (!walletProvider) throw new Error("browser-wallet-missing");
+        await sendWalletTransactionWithError(
+          setWalletError,
+          setLastTransactionDebug,
+          "/api/tx/create-listing",
+          walletAddress,
+          walletProvider,
+          { warehouseAsset, priceEdcoins },
         );
       },
       startDemoRaid: async (safeCaseCapacity = 0) => {
@@ -663,7 +676,18 @@ async function buildDirectSettlementTransaction(
     publicKey: playerKey,
   } as anchor.AnchorProvider;
   const program = new anchor.Program(idl as anchor.Idl, provider);
-  return program.methods
+  const playerAccount = (await program.account.playerProfile.fetch(playerProfile)) as {
+    warehouseNonce: anchor.BN;
+  };
+  const raidAccountDecoded = (await program.account.raidSession.fetch(raidSession)) as {
+    safeCaseSelection: PublicKey[];
+  };
+  const warehouseAssetAccounts = deriveWarehouseAssetAccounts(
+    playerProfile,
+    BigInt(playerAccount.warehouseNonce.toString()),
+    raidAccountDecoded.safeCaseSelection.length,
+  );
+  const builder = program.methods
     .settleFailedRaid()
     .accounts({
       player: playerKey,
@@ -671,8 +695,32 @@ async function buildDirectSettlementTransaction(
       raidSession,
       battleRecord,
       systemProgram: anchor.web3.SystemProgram.programId,
-    })
-    .transaction();
+    });
+  if (warehouseAssetAccounts.length > 0) {
+    builder.remainingAccounts(
+      warehouseAssetAccounts.map((pubkey) => ({
+        pubkey,
+        isWritable: true,
+        isSigner: false,
+      })),
+    );
+  }
+  return builder.transaction();
+}
+
+function deriveWarehouseAssetAccounts(
+  playerProfile: PublicKey,
+  warehouseNonce: bigint,
+  count: number,
+) {
+  return Array.from({ length: count }, (_, index) => {
+    const assetIdBytes = new Uint8Array(8);
+    new DataView(assetIdBytes.buffer).setBigUint64(0, warehouseNonce + BigInt(index + 1), true);
+    return PublicKey.findProgramAddressSync(
+      [new TextEncoder().encode("asset"), playerProfile.toBytes(), assetIdBytes],
+      new PublicKey(PROGRAM_ID),
+    )[0];
+  });
 }
 
 function resolveSessionCredentials(publicKey: PublicKey | null, sessionToken: string | null): SessionCredentials | null {

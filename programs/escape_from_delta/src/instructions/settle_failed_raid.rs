@@ -36,7 +36,7 @@ pub struct SettleFailedRaid<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn handler(ctx: Context<SettleFailedRaid>) -> Result<(u16, u16)> {
+pub fn handler<'info>(ctx: Context<'_, '_, '_, 'info, SettleFailedRaid<'info>>) -> Result<(u16, u16)> {
     let now = Clock::get()?.unix_timestamp;
     let player_profile = &mut ctx.accounts.player_profile;
     let raid_session = &mut ctx.accounts.raid_session;
@@ -66,9 +66,14 @@ pub fn handler(ctx: Context<SettleFailedRaid>) -> Result<(u16, u16)> {
     raid_session.carried_loot = raid_session.safe_case_selection.clone();
     raid_session.settled_at = Some(now);
 
+    let _created_assets = crate::instructions::create_collectible_assets_from_loot(
+        ctx.accounts.player.to_account_info(),
+        player_profile,
+        &retained_assets,
+        ctx.remaining_accounts,
+        ctx.accounts.system_program.to_account_info(),
+    )?;
     player_profile.active_raid = None;
-    player_profile.warehouse_nonce =
-        player_profile.warehouse_nonce.checked_add(1).ok_or(EscapeError::ArithmeticOverflow)?;
 
     let battle_record = &mut ctx.accounts.battle_record;
     battle_record.schema_version = SCHEMA_VERSION;

@@ -85,6 +85,8 @@ pub struct WarehouseAsset {
     pub owner_profile: Pubkey,
     pub asset_type: AssetType,
     pub quality: Option<AssetQuality>,
+    #[max_len(24)]
+    pub collectible_code: String,
     pub armor_tenths: u16,
     pub weapon_tenths: u16,
     pub safe_case_capacity: u8,

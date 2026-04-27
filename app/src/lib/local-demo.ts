@@ -167,6 +167,29 @@ export async function buildPurchaseLoadoutPointsTransaction(
   return finalizeTransaction(provider.connection, transaction, playerKey);
 }
 
+export async function buildCreateListingTransaction(
+  player: string,
+  warehouseAssetAddress: string,
+  priceEdcoins: number,
+) {
+  const { provider, program } = await ensureLocalDemoSetup();
+  const playerKey = new anchor.web3.PublicKey(player);
+  const playerProfile = derivePlayerProfile(playerKey);
+  const warehouseAsset = new anchor.web3.PublicKey(warehouseAssetAddress);
+  const marketplaceListing = deriveMarketplaceListing(warehouseAsset);
+  const transaction = await program.methods
+    .createListing(new anchor.BN(priceEdcoins))
+    .accounts({
+      seller: playerKey,
+      sellerProfile: playerProfile,
+      warehouseAsset,
+      marketplaceListing,
+      systemProgram: anchor.web3.SystemProgram.programId,
+    })
+    .transaction();
+  return finalizeTransaction(provider.connection, transaction, playerKey);
+}
+
 export async function buildConvertSolToEdcoinsTransaction(player: string, solLamports = LAMPORTS_PER_SOL) {
   const { provider, program, gameConfig, wallet } = await ensureLocalDemoSetup();
   const playerKey = new anchor.web3.PublicKey(player);
@@ -193,7 +216,15 @@ export async function buildSettlementTransaction(
   const { playerKey, playerProfile, raidSessionAddress, raidSession } = raidSessionOverride
     ? await getExplicitRaid(program, player, raidSessionOverride)
     : await getActiveRaid(program, player);
+  const playerAccount = await accounts(program).playerProfile.fetch(playerProfile);
   const battleRecord = deriveBattleRecord(playerProfile, Number(raidSession.raidId.toString()));
+  const retainedAssetCount =
+    result === "succeeded" ? raidSession.carriedLoot.length : raidSession.safeCaseSelection.length;
+  const warehouseAssetAccounts = deriveWarehouseAssetAccounts(
+    playerProfile,
+    BigInt(playerAccount.warehouseNonce.toString()),
+    retainedAssetCount,
+  );
   const builder =
     result === "succeeded"
       ? program.methods.extractRaid().accounts({
@@ -210,6 +241,15 @@ export async function buildSettlementTransaction(
           battleRecord,
           systemProgram: anchor.web3.SystemProgram.programId,
         });
+  if (warehouseAssetAccounts.length > 0) {
+    builder.remainingAccounts(
+      warehouseAssetAccounts.map((pubkey) => ({
+        pubkey,
+        isWritable: true,
+        isSigner: false,
+      })),
+    );
+  }
   const transaction = await builder.transaction();
   return finalizeTransaction(provider.connection, transaction, playerKey);
 }
@@ -374,9 +414,16 @@ export async function settleLocalDemoRaid(result: "succeeded" | "failed") {
   const raidSessionAddress = new anchor.web3.PublicKey(player.activeRaid);
   const raidSession = await accounts(program).raidSession.fetch(raidSessionAddress);
   const battleRecord = deriveBattleRecord(playerProfile, Number(raidSession.raidId.toString()));
+  const retainedAssetCount =
+    result === "succeeded" ? raidSession.carriedLoot.length : raidSession.safeCaseSelection.length;
+  const warehouseAssetAccounts = deriveWarehouseAssetAccounts(
+    playerProfile,
+    BigInt(player.warehouseNonce.toString()),
+    retainedAssetCount,
+  );
 
   if (result === "succeeded") {
-    const transaction = await program.methods
+    const builder = program.methods
       .extractRaid()
       .accounts({
         player: wallet,
@@ -384,11 +431,16 @@ export async function settleLocalDemoRaid(result: "succeeded" | "failed") {
         raidSession: raidSessionAddress,
         battleRecord,
         systemProgram: anchor.web3.SystemProgram.programId,
-      })
-      .transaction();
+      });
+    if (warehouseAssetAccounts.length > 0) {
+      builder.remainingAccounts(
+        warehouseAssetAccounts.map((pubkey) => ({ pubkey, isWritable: true, isSigner: false })),
+      );
+    }
+    const transaction = await builder.transaction();
     await sendServerTransaction(program.provider as anchor.AnchorProvider, transaction);
   } else {
-    const transaction = await program.methods
+    const builder = program.methods
       .settleFailedRaid()
       .accounts({
         player: wallet,
@@ -396,8 +448,13 @@ export async function settleLocalDemoRaid(result: "succeeded" | "failed") {
         raidSession: raidSessionAddress,
         battleRecord,
         systemProgram: anchor.web3.SystemProgram.programId,
-      })
-      .transaction();
+      });
+    if (warehouseAssetAccounts.length > 0) {
+      builder.remainingAccounts(
+        warehouseAssetAccounts.map((pubkey) => ({ pubkey, isWritable: true, isSigner: false })),
+      );
+    }
+    const transaction = await builder.transaction();
     await sendServerTransaction(program.provider as anchor.AnchorProvider, transaction);
   }
 
@@ -524,6 +581,32 @@ function deriveBattleRecord(playerProfile: anchor.web3.PublicKey, raidId: number
     [Buffer.from("battle_record"), playerProfile.toBuffer(), u64(raidId)],
     PROGRAM_ID,
   )[0];
+}
+
+function deriveWarehouseAsset(playerProfile: anchor.web3.PublicKey, assetId: bigint) {
+  const assetIdBytes = Buffer.alloc(8);
+  assetIdBytes.writeBigUInt64LE(assetId, 0);
+  return anchor.web3.PublicKey.findProgramAddressSync(
+    [Buffer.from("asset"), playerProfile.toBuffer(), assetIdBytes],
+    PROGRAM_ID,
+  )[0];
+}
+
+function deriveMarketplaceListing(warehouseAsset: anchor.web3.PublicKey) {
+  return anchor.web3.PublicKey.findProgramAddressSync(
+    [Buffer.from("listing"), warehouseAsset.toBuffer()],
+    PROGRAM_ID,
+  )[0];
+}
+
+function deriveWarehouseAssetAccounts(
+  playerProfile: anchor.web3.PublicKey,
+  warehouseNonce: bigint,
+  count: number,
+) {
+  return Array.from({ length: count }, (_, index) =>
+    deriveWarehouseAsset(playerProfile, warehouseNonce + BigInt(index + 1)),
+  );
 }
 
 async function getActiveRaid(program: anchor.Program, player: string) {

@@ -36,7 +36,7 @@ pub struct ExtractRaid<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn handler(ctx: Context<ExtractRaid>) -> Result<()> {
+pub fn handler<'info>(ctx: Context<'_, '_, '_, 'info, ExtractRaid<'info>>) -> Result<()> {
     let now = Clock::get()?.unix_timestamp;
     let player_profile = &mut ctx.accounts.player_profile;
     let raid_session = &mut ctx.accounts.raid_session;
@@ -55,12 +55,16 @@ pub fn handler(ctx: Context<ExtractRaid>) -> Result<()> {
         .weapon_point_balance
         .checked_add(raid_session.current_weapon_tenths)
         .ok_or(EscapeError::ArithmeticOverflow)?;
-    player_profile.active_raid = None;
-    player_profile.warehouse_nonce =
-        player_profile.warehouse_nonce.checked_add(1).ok_or(EscapeError::ArithmeticOverflow)?;
-
     let retained_assets = raid_session.carried_loot.clone();
     let random_event_audits = raid_session.random_events.clone();
+    let _created_assets = crate::instructions::create_collectible_assets_from_loot(
+        ctx.accounts.player.to_account_info(),
+        player_profile,
+        &retained_assets,
+        ctx.remaining_accounts,
+        ctx.accounts.system_program.to_account_info(),
+    )?;
+    player_profile.active_raid = None;
 
     raid_session.status = RaidStatus::Succeeded;
     raid_session.pending_loot = None;

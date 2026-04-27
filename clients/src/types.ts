@@ -24,7 +24,9 @@ export type RaidStatus =
   | "timed_out";
 
 export type AssetType = "collectible" | "armor_points" | "weapon_points" | "safe_case";
+export type AssetQuality = "common" | "uncommon" | "rare" | "epic" | "legendary";
 export type AssetLockState = "available" | "in_raid" | "listed" | "consumed";
+export type ListingStatus = "active" | "sold" | "canceled" | "expired";
 
 export interface PlayerProfile {
   schemaVersion: number;
@@ -41,13 +43,17 @@ export interface PlayerProfile {
 export interface WarehouseAsset {
   schemaVersion: number;
   address: AccountAddress;
+  assetId: string;
   ownerProfile: AccountAddress;
   assetType: AssetType;
+  quality?: AssetQuality;
+  collectibleCode?: string;
   armorTenths: number;
   weaponTenths: number;
   safeCaseCapacity: number;
   lockedState: AssetLockState;
   tradable: boolean;
+  createdFrom: number;
 }
 
 export interface RandomEventAudit {
@@ -79,4 +85,18 @@ export interface DifficultyConfiguration {
   active: boolean;
   entryFeeEdcoins: EdcoinsLamports;
   baseEncounterChances: Record<RiskLevel, number>;
+}
+
+export interface MarketplaceListing {
+  schemaVersion: number;
+  address: AccountAddress;
+  listingId: string;
+  sellerProfile: AccountAddress;
+  assetId: AccountAddress;
+  priceEdcoins: string;
+  feePaidEdcoins: string;
+  status: ListingStatus;
+  buyerProfile?: AccountAddress;
+  createdAt: string;
+  settledAt?: string;
 }

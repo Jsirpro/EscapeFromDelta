@@ -1,6 +1,16 @@
 import { createHash } from "node:crypto";
 
-import type { BattleRecord, PlayerProfile, RaidStatus, RandomEventAudit, RiskLevel } from "../types";
+import type {
+  AssetQuality,
+  BattleRecord,
+  ListingStatus,
+  MarketplaceListing,
+  PlayerProfile,
+  RaidStatus,
+  RandomEventAudit,
+  RiskLevel,
+  WarehouseAsset,
+} from "../types";
 
 const RPC_URL = process.env.RPC_URL ?? process.env.NEXT_PUBLIC_RPC_URL ?? "https://api.devnet.solana.com";
 const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
@@ -21,6 +31,16 @@ interface DecodedPlayerProfileAccount {
 interface DecodedBattleRecordAccount {
   address: string;
   record: BattleRecord;
+}
+
+interface DecodedWarehouseAssetAccount {
+  address: string;
+  asset: WarehouseAsset;
+}
+
+interface DecodedMarketplaceListingAccount {
+  address: string;
+  listing: MarketplaceListing;
 }
 
 interface DecodedRaidSessionAccount {
@@ -45,6 +65,10 @@ class ByteReader {
 
   position(): number {
     return this.offset;
+  }
+
+  remaining(): number {
+    return this.bytes.length - this.offset;
   }
 
   readU8(): number {
@@ -80,6 +104,9 @@ class ByteReader {
   }
 
   readBytes(length: number): Uint8Array {
+    if (length > this.remaining()) {
+      throw new Error("buffer-underflow");
+    }
     const slice = this.bytes.subarray(this.offset, this.offset + length);
     this.offset += length;
     return slice;
@@ -96,6 +123,12 @@ class ByteReader {
   readPubkeyVec(): string[] {
     const length = this.readU32();
     return Array.from({ length }, () => this.readPubkey());
+  }
+
+  readString(): string {
+    const length = this.readU32();
+    const bytes = this.readBytes(length);
+    return new TextDecoder().decode(bytes);
   }
 }
 
@@ -172,6 +205,40 @@ export async function fetchBattleRecordsByWallet(
   return fetchBattleRecordsByPlayer(profile.address, programId, limit, rpcUrl);
 }
 
+export async function fetchWarehouseAssetsByWallet(
+  wallet: string,
+  programId: string,
+  rpcUrl = RPC_URL,
+): Promise<DecodedWarehouseAssetAccount[]> {
+  const profile = await fetchPlayerProfileByWallet(wallet, programId, rpcUrl);
+  if (!profile) return [];
+  const accounts = await getProgramAccounts(programId, rpcUrl, [
+    {
+      memcmp: {
+        offset: 0,
+        bytes: encodeBase58(accountDiscriminator("WarehouseAsset")),
+      },
+    },
+  ]);
+
+  const decoded: DecodedWarehouseAssetAccount[] = [];
+  for (const account of accounts) {
+    try {
+      const asset = decodeWarehouseAssetAccount(account.pubkey, account.account.data[0]);
+      if (asset.ownerProfile === profile.address) {
+        decoded.push({
+          address: account.pubkey,
+          asset,
+        });
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  return decoded.sort((left, right) => Number(BigInt(right.asset.assetId) - BigInt(left.asset.assetId)));
+}
+
 export async function fetchRaidSessionByAddress(
   address: string,
   rpcUrl = RPC_URL,
@@ -186,71 +253,131 @@ export async function fetchRaidSessionByAddress(
   };
 }
 
+export async function fetchActiveMarketplaceListings(
+  programId: string,
+  rpcUrl = RPC_URL,
+): Promise<Array<DecodedMarketplaceListingAccount & { asset: WarehouseAsset | null }>> {
+  const accounts = await getProgramAccounts(programId, rpcUrl, [
+    {
+      memcmp: {
+        offset: 0,
+        bytes: encodeBase58(accountDiscriminator("MarketplaceListing")),
+      },
+    },
+  ]);
+
+  const decoded: DecodedMarketplaceListingAccount[] = [];
+  for (const account of accounts) {
+    try {
+      const listing = decodeMarketplaceListingAccount(account.pubkey, account.account.data[0]);
+      if (listing.status === "active") {
+        decoded.push({
+          address: account.pubkey,
+          listing,
+        });
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  const resolved = await Promise.all(
+    decoded.map(async (entry) => ({
+      ...entry,
+      asset: await fetchWarehouseAssetByAddress(entry.listing.assetId, rpcUrl),
+    })),
+  );
+
+  return resolved.sort((left, right) => Number(BigInt(right.listing.listingId) - BigInt(left.listing.listingId)));
+}
+
 async function getProgramAccounts(
   programId: string,
   rpcUrl: string,
   filters: Array<Record<string, unknown>>,
 ): Promise<RpcAccount[]> {
-  const response = await fetch(rpcUrl, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      jsonrpc: "2.0",
-      id: 1,
-      method: "getProgramAccounts",
-      params: [
-        programId,
-        {
-          encoding: "base64",
-          filters,
-        },
-      ],
-    }),
+  return withRpcRetry(async () => {
+    const response = await fetch(rpcUrl, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "getProgramAccounts",
+        params: [
+          programId,
+          {
+            encoding: "base64",
+            filters,
+          },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`rpc-http-${response.status}`);
+    }
+
+    const payload = (await response.json()) as { error?: { message?: string }; result?: RpcAccount[] };
+    if (payload.error) {
+      throw new Error(payload.error.message ?? "rpc-error");
+    }
+    return payload.result ?? [];
   });
-
-  if (!response.ok) {
-    throw new Error(`rpc-http-${response.status}`);
-  }
-
-  const payload = (await response.json()) as { error?: { message?: string }; result?: RpcAccount[] };
-  if (payload.error) {
-    throw new Error(payload.error.message ?? "rpc-error");
-  }
-  return payload.result ?? [];
 }
 
 async function getAccountInfo(
   address: string,
   rpcUrl: string,
 ): Promise<{ data: [string, string] } | null> {
-  const response = await fetch(rpcUrl, {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({
-      jsonrpc: "2.0",
-      id: 1,
-      method: "getAccountInfo",
-      params: [
-        address,
-        {
-          encoding: "base64",
-        },
-      ],
-    }),
+  return withRpcRetry(async () => {
+    const response = await fetch(rpcUrl, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "getAccountInfo",
+        params: [
+          address,
+          {
+            encoding: "base64",
+          },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`rpc-http-${response.status}`);
+    }
+
+    const payload = (await response.json()) as {
+      error?: { message?: string };
+      result?: { value?: { data: [string, string] } | null };
+    };
+    if (payload.error) {
+      throw new Error(payload.error.message ?? "rpc-error");
+    }
+    return payload.result?.value ?? null;
   });
+}
 
-  if (!response.ok) {
-    throw new Error(`rpc-http-${response.status}`);
+async function withRpcRetry<T>(operation: () => Promise<T>, attempt = 0): Promise<T> {
+  try {
+    return await operation();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    const shouldRetry = attempt < 2 && (message === "rpc-http-429" || message.includes("429"));
+    if (!shouldRetry) {
+      throw error;
+    }
+    await sleep(300 * (attempt + 1));
+    return withRpcRetry(operation, attempt + 1);
   }
+}
 
-  const payload = (await response.json()) as {
-    error?: { message?: string };
-    result?: { value?: { data: [string, string] } | null };
-  };
-  if (payload.error) {
-    throw new Error(payload.error.message ?? "rpc-error");
-  }
-  return payload.result?.value ?? null;
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function decodePlayerProfileAccount(base64: string): PlayerProfile {
@@ -315,6 +442,65 @@ function decodeRaidSessionAccount(base64: string): DecodedRaidSessionAccount["ra
   } catch {
     return decodeRaidSessionLayout(bytes.subarray(8), false);
   }
+}
+
+function decodeWarehouseAssetAccount(address: string, base64: string): WarehouseAsset {
+  const bytes = Buffer.from(base64, "base64");
+  try {
+    return decodeWarehouseAssetLayout(address, bytes.subarray(8), true);
+  } catch {
+    return decodeWarehouseAssetLayout(address, bytes.subarray(8), false);
+  }
+}
+
+function decodeWarehouseAssetLayout(address: string, bytes: Uint8Array, hasCollectibleCode: boolean): WarehouseAsset {
+  const reader = new ByteReader(bytes);
+  const schemaVersion = reader.readU16();
+  const assetId = reader.readU64().toString();
+  const ownerProfile = reader.readPubkey() as WarehouseAsset["ownerProfile"];
+  const assetType = decodeAssetType(reader.readU8());
+  const quality = decodeOptionalAssetQuality(reader);
+  let collectibleCode: string | undefined;
+  if (hasCollectibleCode) {
+    const codeLength = reader.readU32();
+    if (codeLength > 24 || codeLength > reader.remaining() - 7) {
+      throw new Error("invalid-collectible-code-length");
+    }
+    collectibleCode = new TextDecoder().decode(reader.readBytes(codeLength)) || undefined;
+  }
+  return {
+    schemaVersion,
+    address: address as WarehouseAsset["address"],
+    assetId,
+    ownerProfile,
+    assetType,
+    quality,
+    collectibleCode,
+    armorTenths: reader.readU16(),
+    weaponTenths: reader.readU16(),
+    safeCaseCapacity: reader.readU8(),
+    tradable: reader.readBool(),
+    lockedState: decodeAssetLockState(reader.readU8()),
+    createdFrom: reader.readU8(),
+  };
+}
+
+function decodeMarketplaceListingAccount(address: string, base64: string): MarketplaceListing {
+  const bytes = Buffer.from(base64, "base64");
+  const reader = new ByteReader(bytes.subarray(8));
+  return {
+    schemaVersion: reader.readU16(),
+    address: address as MarketplaceListing["address"],
+    listingId: reader.readU64().toString(),
+    sellerProfile: reader.readPubkey() as MarketplaceListing["sellerProfile"],
+    assetId: reader.readPubkey() as MarketplaceListing["assetId"],
+    priceEdcoins: reader.readU64().toString(),
+    feePaidEdcoins: reader.readU64().toString(),
+    status: decodeListingStatus(reader.readU8()),
+    buyerProfile: reader.readOptionalPubkey() as MarketplaceListing["buyerProfile"],
+    createdAt: reader.readI64().toString(),
+    settledAt: decodeOptionalI64(reader),
+  };
 }
 
 function decodeRaidSessionLayout(bytes: Uint8Array, hasPendingLoot: boolean): DecodedRaidSessionAccount["raid"] {
@@ -394,6 +580,42 @@ function decodeRaidResult(value: number): BattleRecord["result"] {
   return "timed_out";
 }
 
+function decodeListingStatus(value: number): ListingStatus {
+  if (value === 1) return "sold";
+  if (value === 2) return "canceled";
+  if (value === 3) return "expired";
+  return "active";
+}
+
+function decodeAssetType(value: number): WarehouseAsset["assetType"] {
+  if (value === 1) return "armor_points";
+  if (value === 2) return "weapon_points";
+  if (value === 3) return "safe_case";
+  return "collectible";
+}
+
+function decodeOptionalAssetQuality(reader: ByteReader): AssetQuality | undefined {
+  if (!reader.readBool()) {
+    return undefined;
+  }
+  return decodeAssetQuality(reader.readU8());
+}
+
+function decodeAssetQuality(value: number): AssetQuality {
+  if (value === 1) return "uncommon";
+  if (value === 2) return "rare";
+  if (value === 3) return "epic";
+  if (value === 4) return "legendary";
+  return "common";
+}
+
+function decodeAssetLockState(value: number): WarehouseAsset["lockedState"] {
+  if (value === 1) return "in_raid";
+  if (value === 2) return "listed";
+  if (value === 3) return "consumed";
+  return "available";
+}
+
 function decodeRaidStatus(value: number): RaidStatus {
   if (value === 1) return "active";
   if (value === 2) return "pending_battle";
@@ -430,6 +652,13 @@ function decodeRandomOutcome(value: number): string {
   ][value] ?? "unknown";
 }
 
+function decodeOptionalI64(reader: ByteReader): string | undefined {
+  if (!reader.readBool()) {
+    return undefined;
+  }
+  return reader.readI64().toString();
+}
+
 function accountDiscriminator(name: string): Uint8Array {
   return createHash("sha256").update(`account:${name}`).digest().subarray(0, 8);
 }
@@ -440,6 +669,18 @@ function derivePlayerProfileAddress(wallet: string, programId: string): string {
     decodeBase58(programId),
   );
   return encodeBase58(address);
+}
+
+async function fetchWarehouseAssetByAddress(address: string, rpcUrl: string): Promise<WarehouseAsset | null> {
+  const account = await getAccountInfo(address, rpcUrl);
+  if (!account?.data?.[0]) {
+    return null;
+  }
+  try {
+    return decodeWarehouseAssetAccount(address, account.data[0]);
+  } catch {
+    return null;
+  }
 }
 
 export function encodeBase58(bytes: Uint8Array): string {

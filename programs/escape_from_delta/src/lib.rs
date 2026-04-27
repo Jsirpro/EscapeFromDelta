@@ -97,11 +97,13 @@ pub mod escape_from_delta {
         instructions::move_area::handler(ctx, target_area)
     }
 
-    pub fn extract_raid(ctx: Context<ExtractRaid>) -> Result<()> {
+    pub fn extract_raid<'info>(ctx: Context<'_, '_, '_, 'info, ExtractRaid<'info>>) -> Result<()> {
         instructions::extract_raid::handler(ctx)
     }
 
-    pub fn settle_failed_raid(ctx: Context<SettleFailedRaid>) -> Result<(u16, u16)> {
+    pub fn settle_failed_raid<'info>(
+        ctx: Context<'_, '_, '_, 'info, SettleFailedRaid<'info>>,
+    ) -> Result<(u16, u16)> {
         instructions::settle_failed_raid::handler(ctx)
     }
 

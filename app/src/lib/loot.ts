@@ -9,6 +9,22 @@ export interface LootDisplayItem {
   label: string;
 }
 
+export function deriveCollectibleDisplayFromCode(code: string, assetId: string): LootDisplayItem {
+  const match = /^(rare|epic|legendary)_(\d{2})$/.exec(code);
+  if (!match) {
+    return deriveCollectibleDisplay(assetId);
+  }
+  const rarity = match[1] as LootDisplayItem["rarity"];
+  const serial = Number.parseInt(match[2], 10);
+  const labelPrefix =
+    rarity === "legendary" ? "Legendary Collectible" : rarity === "epic" ? "Epic Collectible" : "Rare Collectible";
+  return {
+    assetId,
+    rarity,
+    label: `${labelPrefix} ${serial}`,
+  };
+}
+
 export function deriveCollectibleDisplay(assetId: string): LootDisplayItem {
   const bytes = decodeBase58(assetId);
   const rarityRoll = ((bytes[0] ?? 0) + (bytes[7] ?? 0) + (bytes[13] ?? 0)) % 100;
