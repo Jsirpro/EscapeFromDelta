@@ -12,6 +12,7 @@
     "@escape-from-delta/clients": "0.1.0",
     "@magicblock-labs/gum-react-sdk": "^3.0.10",
     "@solana/web3.js": "^1.95.3",
+    "lucide-react": "^1.11.0",
     "next": "^14.2.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0"
