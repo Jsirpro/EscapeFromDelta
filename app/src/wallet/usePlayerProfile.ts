@@ -25,6 +25,7 @@ export function usePlayerProfile() {
   const wallet = useWalletState();
   const [conversionError, setConversionError] = useState<string | null>(null);
   const [remoteProfile, setRemoteProfile] = useState<PlayerProfile | null>(null);
+  const [remoteProfileAddress, setRemoteProfileAddress] = useState<string | null>(null);
   const [remoteBattleRecords, setRemoteBattleRecords] = useState<BattleRecord[] | null>(null);
   const [remoteWarehouseAssets, setRemoteWarehouseAssets] = useState<WarehouseAsset[] | null>(null);
   const [remoteWarehouseAssetsDebug, setRemoteWarehouseAssetsDebug] = useState<Record<string, unknown> | null>(null);
@@ -40,17 +41,20 @@ export function usePlayerProfile() {
   const refreshRemote = async () => {
     if (!wallet.connected || !wallet.walletAddress) {
       setRemoteProfile(null);
+      setRemoteProfileAddress(null);
       setRemoteRaid(null);
       setRemoteLoaded(false);
       return;
     }
     const playerPayload = await fetchBrowserPlayerProfile(connection, wallet.walletAddress, programId);
     const nextProfile = playerPayload?.profile ?? null;
+    const nextProfileAddress = playerPayload?.address ?? null;
     const nextRaid = nextProfile?.activeRaid ? await fetchBrowserRaidState(connection, nextProfile.activeRaid) : null;
     setRemoteProfile(nextProfile);
+    setRemoteProfileAddress(nextProfileAddress);
     setRemoteRaid(nextRaid);
     setRemoteLoaded(true);
-    return { profile: nextProfile, raid: nextRaid };
+    return { profile: nextProfile, profileAddress: nextProfileAddress, raid: nextRaid };
   };
 
   const refreshRecords = async () => {
@@ -101,6 +105,7 @@ export function usePlayerProfile() {
     void refreshRemote().catch(() => {
       if (!cancelled) {
         setRemoteProfile(null);
+        setRemoteProfileAddress(null);
         setRemoteRaid(null);
         setRemoteLoaded(true);
       }
@@ -133,6 +138,7 @@ export function usePlayerProfile() {
     () => ({
       ...wallet,
       profile: wallet.connected ? remoteProfile : profile,
+      onChainProfileAddress: remoteProfileAddress,
       onChainProfile: remoteProfile,
       onChainActiveRaid: remoteProfile?.activeRaid ?? null,
       onChainRaidStatus: remoteRaid?.status ?? null,
@@ -172,6 +178,17 @@ export function usePlayerProfile() {
         await refreshAssets().catch(() => null);
         return refreshRemoteSafe();
       },
+      purchaseMarketplaceListing: async (listing: string) => {
+        await wallet.purchaseMarketplaceListing(listing);
+        const snapshot = await refreshRemoteSafe();
+        await refreshAssets().catch(() => null);
+        return snapshot;
+      },
+      cancelMarketplaceListing: async (listing: string) => {
+        await wallet.cancelMarketplaceListing(listing);
+        await refreshAssets().catch(() => null);
+        return refreshRemoteSafe();
+      },
       startDemoRaid: async (safeCaseCapacity = 0) => {
         await wallet.startDemoRaid(safeCaseCapacity);
         return refreshRemoteSafe();
@@ -205,6 +222,6 @@ export function usePlayerProfile() {
         return refreshRemoteSafe();
       },
     }),
-    [wallet, profile, remoteProfile, remoteBattleRecords, remoteWarehouseAssets, remoteWarehouseAssetsDebug, remoteRaid, conversionError, remoteLoaded],
+    [wallet, profile, remoteProfile, remoteProfileAddress, remoteBattleRecords, remoteWarehouseAssets, remoteWarehouseAssetsDebug, remoteRaid, conversionError, remoteLoaded],
   );
 }

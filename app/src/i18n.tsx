@@ -165,6 +165,8 @@ export const copy = {
       listings: "Listings",
       feeCharged: "Fee paid",
       seller: "Seller",
+      buy: "Buy",
+      cancel: "Cancel Listing",
     },
     admin: {
       eyebrow: "Operator tools",
@@ -334,6 +336,8 @@ export const copy = {
       listings: "上架列表",
       feeCharged: "已付手续费",
       seller: "卖家",
+      buy: "购买",
+      cancel: "下架",
     },
     admin: {
       eyebrow: "管理员工具",

@@ -18,7 +18,12 @@ pub struct PurchaseListing<'info> {
         constraint = buyer_profile.wallet == buyer.key() @ EscapeError::Unauthorized
     )]
     pub buyer_profile: Account<'info, PlayerProfile>,
-    #[account(mut)]
+    #[account(
+        mut,
+        seeds = [SEED_PLAYER, seller_profile.wallet.as_ref()],
+        bump = seller_profile.bump,
+        constraint = seller_profile.key() == marketplace_listing.seller_profile @ EscapeError::InvalidListing
+    )]
     pub seller_profile: Account<'info, PlayerProfile>,
     #[account(
         mut,

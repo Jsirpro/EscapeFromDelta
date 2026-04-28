@@ -50,6 +50,8 @@ interface WalletState {
   convertDemoSol: (solAmount?: bigint) => Promise<void>;
   purchaseLoadoutPoints: (kind: "armor" | "weapon", amountTenths?: number) => Promise<void>;
   createMarketplaceListing: (warehouseAsset: string, priceEdcoins: number) => Promise<void>;
+  purchaseMarketplaceListing: (listing: string) => Promise<void>;
+  cancelMarketplaceListing: (listing: string) => Promise<void>;
   startDemoRaid: (safeCaseCapacity?: number) => Promise<void>;
   openDemoContainer: (containerIndex?: number, finalRandomValue?: number) => Promise<void>;
   fightDemoEnemy: () => Promise<void>;
@@ -208,6 +210,30 @@ export function WalletProvider({ children }: { children: ReactNode }) {
           walletAddress,
           walletProvider,
           { warehouseAsset, priceEdcoins },
+        );
+      },
+      purchaseMarketplaceListing: async (listing) => {
+        if (!walletAddress) throw new Error("wallet-not-connected");
+        if (!walletProvider) throw new Error("browser-wallet-missing");
+        await sendWalletTransactionWithError(
+          setWalletError,
+          setLastTransactionDebug,
+          "/api/tx/purchase-listing",
+          walletAddress,
+          walletProvider,
+          { listing },
+        );
+      },
+      cancelMarketplaceListing: async (listing) => {
+        if (!walletAddress) throw new Error("wallet-not-connected");
+        if (!walletProvider) throw new Error("browser-wallet-missing");
+        await sendWalletTransactionWithError(
+          setWalletError,
+          setLastTransactionDebug,
+          "/api/tx/cancel-listing",
+          walletAddress,
+          walletProvider,
+          { listing },
         );
       },
       startDemoRaid: async (safeCaseCapacity = 0) => {

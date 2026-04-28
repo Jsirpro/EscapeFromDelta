@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useI18n } from "../i18n";
 import { deriveCollectibleDisplay, deriveCollectibleDisplayFromCode } from "../lib/loot";
+import { usePlayerProfile } from "../wallet/usePlayerProfile";
 
 interface ListingWithAsset {
   address: string;
@@ -21,8 +22,16 @@ interface ListingWithAsset {
 
 export function MarketplaceListings() {
   const { t } = useI18n();
+  const player = usePlayerProfile();
   const [listings, setListings] = useState<ListingWithAsset[]>([]);
   const [error, setError] = useState<string | null>(null);
+
+  async function refreshListings() {
+    const response = await fetch("/api/listings", { cache: "no-store" });
+    const payload = await response.json();
+    setListings(payload.listings ?? []);
+    setError(payload.error ?? null);
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -52,6 +61,7 @@ export function MarketplaceListings() {
       ) : (
         <div className="loot-grid">
           {listings.map((listing) => {
+            const isOwnListing = player.onChainProfileAddress === listing.sellerProfile;
             const display = listing.asset?.collectibleCode
               ? deriveCollectibleDisplayFromCode(listing.asset.collectibleCode, listing.asset.address)
               : deriveCollectibleDisplay(listing.asset?.address ?? listing.assetId);
@@ -76,6 +86,21 @@ export function MarketplaceListings() {
                 <p className="field-label">
                   {t.marketplace.seller}: {listing.sellerProfile}
                 </p>
+                <button
+                  className="button"
+                  type="button"
+                  disabled={!player.connected}
+                  onClick={async () => {
+                    if (isOwnListing) {
+                      await player.cancelMarketplaceListing(listing.address);
+                    } else {
+                      await player.purchaseMarketplaceListing(listing.address);
+                    }
+                    await refreshListings();
+                  }}
+                >
+                  {isOwnListing ? t.marketplace.cancel : t.marketplace.buy}
+                </button>
               </div>
             );
           })}

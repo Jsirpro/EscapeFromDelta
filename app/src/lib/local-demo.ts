@@ -190,6 +190,46 @@ export async function buildCreateListingTransaction(
   return finalizeTransaction(provider.connection, transaction, playerKey);
 }
 
+export async function buildPurchaseListingTransaction(player: string, listingAddress: string) {
+  const { provider, program } = await ensureLocalDemoSetup();
+  const playerKey = new anchor.web3.PublicKey(player);
+  const buyerProfile = derivePlayerProfile(playerKey);
+  const marketplaceListing = new anchor.web3.PublicKey(listingAddress);
+  const listingAccount = await accounts(program).marketplaceListing.fetch(marketplaceListing);
+  const sellerProfile = new anchor.web3.PublicKey(listingAccount.sellerProfile);
+  const warehouseAsset = new anchor.web3.PublicKey(listingAccount.assetId);
+  const transaction = await program.methods
+    .purchaseListing()
+    .accounts({
+      buyer: playerKey,
+      buyerProfile,
+      sellerProfile,
+      warehouseAsset,
+      marketplaceListing,
+    })
+    .transaction();
+  return finalizeTransaction(provider.connection, transaction, playerKey);
+}
+
+export async function buildCancelListingTransaction(player: string, listingAddress: string) {
+  const { provider, program } = await ensureLocalDemoSetup();
+  const playerKey = new anchor.web3.PublicKey(player);
+  const sellerProfile = derivePlayerProfile(playerKey);
+  const marketplaceListing = new anchor.web3.PublicKey(listingAddress);
+  const listingAccount = await accounts(program).marketplaceListing.fetch(marketplaceListing);
+  const warehouseAsset = new anchor.web3.PublicKey(listingAccount.assetId);
+  const transaction = await program.methods
+    .cancelListing()
+    .accounts({
+      seller: playerKey,
+      sellerProfile,
+      warehouseAsset,
+      marketplaceListing,
+    })
+    .transaction();
+  return finalizeTransaction(provider.connection, transaction, playerKey);
+}
+
 export async function buildConvertSolToEdcoinsTransaction(player: string, solLamports = LAMPORTS_PER_SOL) {
   const { provider, program, gameConfig, wallet } = await ensureLocalDemoSetup();
   const playerKey = new anchor.web3.PublicKey(player);

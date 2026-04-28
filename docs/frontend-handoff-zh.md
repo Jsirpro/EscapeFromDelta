@@ -359,6 +359,108 @@ API 路由：
 
 战绩页读取这个。
 
+## 9. 2026-04-28 交易系统更新
+
+这部分是对上面旧描述的覆盖说明，以当前代码为准。
+
+### 9.1 仓库不再主要依赖 battle records 聚合
+
+当前 `/warehouse` 已经开始以真实 `WarehouseAsset` 为主。
+
+现在仓库页分两层：
+
+1. 收藏品聚合展示
+   - 按 `collectible_code + locked_state` 聚合数量
+
+2. 可上架资产
+   - 逐件列出真实 `WarehouseAsset`
+   - 仅允许 `locked_state === available` 的收藏品上架
+
+### 9.2 `collectible_code` 已经成为收藏品主键
+
+当前新资产会有：
+
+- `rare_07`
+- `epic_03`
+- `legendary_01`
+
+以后前端做：
+
+- 收藏品名字
+- 收藏品 icon
+- 详情描述
+- 市场卡片
+
+都应该基于 `collectible_code` 映射。
+
+### 9.3 旧资产与新资产的边界
+
+在补 `collectible_code` 之前创建的旧 `WarehouseAsset`：
+
+- 能展示
+- 当前不会开放上架
+
+原因是交易系统和后续资源映射都依赖 `collectible_code`。
+
+### 9.4 `/warehouse` 已支持真实上架
+
+当前流程：
+
+1. 玩家在仓库里看到逐件可上架收藏品
+2. 输入 `priceEdcoins`
+3. 预览 `3%` 手续费
+4. 钱包签名发送 `create_listing`
+
+链上效果：
+
+- 卖家支付 `3%` fee
+- `WarehouseAsset.locked_state = Listed`
+- 创建真实 `MarketplaceListing`
+
+### 9.5 `/marketplace` 已支持真实上架列表
+
+当前 `/marketplace` 不再是静态壳。
+
+它会读取真实链上的 `Active MarketplaceListing`，并展示：
+
+- 收藏品文本
+- 品质
+- 价格
+- 已付手续费
+- 卖家 `sellerProfile`
+
+### 9.6 `/marketplace` 已接入购买与下架按钮
+
+当前每条 listing 会根据当前连接玩家身份显示不同按钮：
+
+- 如果 `listing.sellerProfile !== 当前玩家 onChainProfileAddress`
+  - 显示 `购买 / Buy`
+- 如果 `listing.sellerProfile === 当前玩家 onChainProfileAddress`
+  - 显示 `下架 / Cancel Listing`
+
+购买闭环目标是：
+
+- 买家扣 `EDcoins`
+- 卖家加 `EDcoins`
+- `WarehouseAsset.owner_profile` 改成买家
+- `WarehouseAsset.locked_state` 改回 `Available`
+- `MarketplaceListing.status` 改成 `Sold`
+
+下架链上目标是：
+
+- `MarketplaceListing.status` 改成 `Canceled`
+- `WarehouseAsset.locked_state` 从 `Listed` 改回 `Available`
+- 资产重新回到仓库的可上架列表里
+
+### 9.7 当前交易系统还没补完的点
+
+目前仍未完成或未开放的主要部分：
+
+- 我的上架
+- 我的成交记录
+- 市场筛选 / 排序
+- 更完整的双钱包购买验证体验
+
 ### 6.5 MarketplaceListing
 
 交易页读取这个。

@@ -418,6 +418,156 @@
 
 #### 对应合约指令
 
+## 补充更新：2026-04-28 交易系统接口
+
+以下内容是当前仓库与市场系统的新增接口和行为，优先级高于本文旧描述。
+
+### A. 新增读取接口：仓库真实资产
+
+**GET** `/api/assets/[wallet]`
+
+作用：
+
+- 查询当前钱包对应玩家的真实 `WarehouseAsset`
+
+当前返回字段重点包括：
+
+- `address`
+- `assetId`
+- `ownerProfile`
+- `assetType`
+- `quality`
+- `collectibleCode`
+- `lockedState`
+- `tradable`
+
+说明：
+
+- 当前 `/warehouse` 主要依赖这个接口
+- `collectibleCode` 是后续名字和 icon 的主键
+
+### B. 新增读取接口：真实上架列表
+
+**GET** `/api/listings`
+
+作用：
+
+- 查询链上 `Active MarketplaceListing`
+- 同时附带对应 `WarehouseAsset` 的轻量信息
+
+当前返回里的每条 listing 重点包括：
+
+- `address`
+- `listingId`
+- `sellerProfile`
+- `assetId`
+- `priceEdcoins`
+- `feePaidEdcoins`
+- `status`
+- `asset.quality`
+- `asset.collectibleCode`
+
+### C. 新增交易接口：创建上架
+
+**POST** `/api/tx/create-listing`
+
+请求：
+
+```json
+{
+  "player": "<wallet-pubkey>",
+  "warehouseAsset": "<warehouse-asset-pda>",
+  "priceEdcoins": 3000
+}
+```
+
+对应合约指令：
+
+- `create_listing(price_edcoins)`
+
+当前链上效果：
+
+- 卖家支付 `3%` 手续费
+- `WarehouseAsset.locked_state` 从 `Available` 改成 `Listed`
+- 创建真实 `MarketplaceListing`
+
+### D. 新增交易接口：购买上架物品
+
+**POST** `/api/tx/purchase-listing`
+
+请求：
+
+```json
+{
+  "player": "<wallet-pubkey>",
+  "listing": "<marketplace-listing-pda>"
+}
+```
+
+对应合约指令：
+
+- `purchase_listing()`
+
+当前目标链上效果：
+
+- 买家扣 `EDcoins`
+- 卖家加 `EDcoins`
+- `WarehouseAsset.owner_profile` 改成买家
+- `WarehouseAsset.locked_state` 改回 `Available`
+- `MarketplaceListing.status` 改成 `Sold`
+
+### E. 新增交易接口：下架上架物品
+
+**POST** `/api/tx/cancel-listing`
+
+请求：
+
+```json
+{
+  "player": "<wallet-pubkey>",
+  "listing": "<marketplace-listing-pda>"
+}
+```
+
+对应合约指令：
+
+- `cancel_listing()`
+
+当前链上效果：
+
+- `MarketplaceListing.status` 改成 `Canceled`
+- `WarehouseAsset.locked_state` 从 `Listed` 改回 `Available`
+
+### F. `/marketplace` 当前按钮决策逻辑
+
+当前前端会读取连接钱包对应的 `onChainProfileAddress`，并按下面规则决定按钮：
+
+- 如果 `listing.sellerProfile === onChainProfileAddress`
+  - 显示 `下架 / Cancel Listing`
+- 否则
+  - 显示 `购买 / Buy`
+
+### G. 交易系统当前都走钱包签名
+
+以下动作当前都不是 session key：
+
+- `create_listing`
+- `purchase_listing`
+- `cancel_listing`
+
+原因是它们都属于真正的资产变动，不是局内临时动作。
+
+### H. 当前一个重要兼容边界
+
+旧版 `WarehouseAsset` 可能没有 `collectibleCode`。
+
+当前前端策略：
+
+- 可以展示
+- 不允许上架
+
+所以如果看到旧资产不能上架，这不是单纯前端 bug，而是当前资产模型升级后的兼容边界。
+
 - `select_safe_case_items(selected_assets, capacity)`
 
 #### 说明
