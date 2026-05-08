@@ -4,7 +4,7 @@ import * as anchor from "@coral-xyz/anchor";
 import { useSessionKeyManager } from "@magicblock-labs/gum-react-sdk";
 import { Connection, PublicKey, Transaction, type SendOptions } from "@solana/web3.js";
 import bs58 from "bs58";
-import { createContext, type ReactNode, useContext, useMemo, useState } from "react";
+import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from "react";
 import idl from "../../../target/idl/escape_from_delta.json";
 import { decodeBattleRecord } from "../../../clients/src/queries/battleRecords";
 import { decodePlayerProfile } from "../../../clients/src/queries/player";
@@ -17,6 +17,7 @@ const SOLANA_CLUSTER =
   (process.env.NEXT_PUBLIC_SOLANA_CLUSTER as "devnet" | "localnet" | undefined) ?? "devnet";
 const SESSION_TOP_UP_LAMPORTS = 10_000_000;
 const SESSION_EXPIRY_MINUTES = 10;
+const WALLET_RECONNECT_STORAGE_KEY = "escape-from-delta.wallet.reconnect";
 
 interface AccountInfoLike {
   owner: string;
@@ -84,6 +85,31 @@ function createPlayerAccount(walletAddress: string): AccountInfoLike {
   };
 }
 
+function readReconnectPreference() {
+  if (typeof window === "undefined") return false;
+  return window.localStorage.getItem(WALLET_RECONNECT_STORAGE_KEY) === "true";
+}
+
+function writeReconnectPreference(connected: boolean) {
+  if (typeof window === "undefined") return;
+  if (connected) {
+    window.localStorage.setItem(WALLET_RECONNECT_STORAGE_KEY, "true");
+    return;
+  }
+  window.localStorage.removeItem(WALLET_RECONNECT_STORAGE_KEY);
+}
+
+async function waitForBrowserWallet(maxAttempts = 20, intervalMs = 100): Promise<BrowserWalletProvider | null> {
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const provider = getBrowserWallet();
+    if (provider) {
+      return provider;
+    }
+    await new Promise((resolve) => window.setTimeout(resolve, intervalMs));
+  }
+  return null;
+}
+
 export function WalletProvider({ children }: { children: ReactNode }) {
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [profileAccounts, setProfileAccounts] = useState<Record<string, AccountInfoLike>>({});
@@ -106,6 +132,46 @@ export function WalletProvider({ children }: { children: ReactNode }) {
     };
   }, [walletAddress, walletProvider]);
   const sessionWallet = useSessionKeyManager(anchorWallet, connection, SOLANA_CLUSTER);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function restoreWalletConnection() {
+      if (!readReconnectPreference()) return;
+      setConnecting(true);
+      setWalletError(null);
+      try {
+        const browserWallet = await waitForBrowserWallet();
+        if (!browserWallet) {
+          return;
+        }
+        const response = await browserWallet.connect({ onlyIfTrusted: true });
+        const nextWallet = response.publicKey?.toBase58() ?? browserWallet.publicKey?.toBase58();
+        if (!nextWallet || cancelled) {
+          return;
+        }
+        setWalletProvider(browserWallet);
+        setWalletAddress(nextWallet);
+      } catch (error) {
+        if (!cancelled) {
+          setWalletProvider(null);
+          setWalletAddress(null);
+          writeReconnectPreference(false);
+        }
+      } finally {
+        if (!cancelled) {
+          setConnecting(false);
+        }
+      }
+    }
+
+    void restoreWalletConnection();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const value = useMemo<WalletState>(() => {
     const profileAccount = walletAddress ? profileAccounts[walletAddress] ?? null : null;
     const recordAccounts = walletAddress ? battleRecordAccounts[walletAddress] ?? [] : [];
@@ -145,6 +211,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
           setWalletProvider(browserWallet);
           setWalletAddress(nextWallet);
           setLocalSessionCredentials(null);
+          writeReconnectPreference(true);
 
           const connection = new Connection(RPC_URL, "confirmed");
           void waitForSignatureStatus(connection, connectResult.signature, connectResult.lastValidBlockHeight)
@@ -170,6 +237,7 @@ export function WalletProvider({ children }: { children: ReactNode }) {
         setLocalSessionCredentials(null);
         setWalletProvider(null);
         setWalletAddress(null);
+        writeReconnectPreference(false);
       },
       profileAccount,
       battleRecordAccounts: recordAccounts,
