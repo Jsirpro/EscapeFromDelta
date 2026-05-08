@@ -11,13 +11,13 @@ import { RaidActionPanel } from "../../game/RaidActionPanel";
 import { RaidResult } from "../../game/RaidResult";
 import { SafeCaseSelection } from "../../game/SafeCaseSelection";
 import { initialRaidUiState, raidReducer } from "../../game/raidMachine";
-import { useI18n } from "../../i18n";
+import { type Language, useI18n } from "../../i18n";
 import { usePlayerProfile } from "../../wallet/usePlayerProfile";
 
 export default function PlayPage() {
   const [state, dispatch] = useReducer(raidReducer, initialRaidUiState);
   const player = usePlayerProfile();
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [feedFrame, setFeedFrame] = useState(0);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -76,6 +76,14 @@ export default function PlayPage() {
   const tacticalFeedGhostPath = useMemo(
     () => buildTacticalFeedPath((feedFrame + TACTICAL_FEED_PATTERNS.length - 1) % TACTICAL_FEED_PATTERNS.length, 0.74),
     [feedFrame],
+  );
+  const extractionChance = useMemo(
+    () => getMissionExtractionChance(state.currentArea, state.status === "pending_battle"),
+    [state.currentArea, state.status],
+  );
+  const missionNarrative = useMemo(
+    () => getMissionNarrative(language, state.currentArea, state.status === "pending_battle", player.onChainLootItems.length > 0),
+    [language, state.currentArea, state.status, player.onChainLootItems.length],
   );
 
   const raidStatusLabel = useMemo(() => {
@@ -317,6 +325,7 @@ export default function PlayPage() {
   }
 
   const isPreparingPhase = state.status === "preparing" || state.status === "transitioning" || showResumePrompt;
+  const isMissionActivePhase = state.status === "active" || state.status === "pending_battle";
 
   if (isPreparingPhase) {
     return (
@@ -854,6 +863,325 @@ export default function PlayPage() {
     );
   }
 
+  if (isMissionActivePhase) {
+    const secondaryActionLabel =
+      state.status === "pending_battle"
+        ? busyAction === "abandon"
+          ? t.play.abandoningRaid
+          : getMissionSecondaryActionLabel(language, "retreat")
+        : state.currentArea === "low"
+          ? busyAction === "move"
+            ? t.play.movingZone
+            : getMissionSecondaryActionLabel(language, "advance")
+          : busyAction === "extract"
+            ? t.play.extracting
+            : getMissionSecondaryActionLabel(language, "extract");
+
+    return (
+      <div className="min-h-screen font-mono selection:bg-emerald-500/30" style={{ background: "#05070a", color: "#c0ccd8" }}>
+        <div
+          className="fixed inset-0 pointer-events-none opacity-[0.03]"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(18,16,16,0) 50%,rgba(0,0,0,0.25) 50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))",
+            backgroundSize: "100% 2px, 2px 100%",
+          }}
+        />
+
+        <div style={{ maxWidth: "1540px", margin: "0 auto", padding: "28px 20px 24px", display: "flex", flexDirection: "column", gap: 26, minHeight: "100vh" }}>
+          <header style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 20 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 22 }}>
+              <Link
+                href="/"
+                aria-label={t.common.backHome}
+                style={{
+                  width: 44,
+                  height: 44,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: "#64748b",
+                  borderRadius: 10,
+                  border: "1px solid transparent",
+                  transition: "all 0.2s",
+                }}
+              >
+                <IconArrowLeft size={26} />
+              </Link>
+              <h1
+                style={{
+                  margin: 0,
+                  fontSize: "3.4rem",
+                  lineHeight: 0.92,
+                  fontStyle: "italic",
+                  fontWeight: 900,
+                  letterSpacing: "0.04em",
+                  color: "#fff",
+                  textTransform: "uppercase",
+                }}
+              >
+                MISSION ACTIVE
+              </h1>
+            </div>
+
+            <div
+              style={{
+                padding: 6,
+                borderRadius: 10,
+                border: "1px solid rgba(255,255,255,0.08)",
+                background: "rgba(255,255,255,0.03)",
+              }}
+            >
+              <LanguageToggle />
+            </div>
+          </header>
+
+          <div style={{ display: "grid", gridTemplateColumns: "390px minmax(0, 1fr)", gap: 28, alignItems: "stretch", flex: 1 }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+              <div
+                style={{
+                  borderRadius: 26,
+                  border: "1px solid rgba(16,185,129,0.28)",
+                  background: "rgba(7,20,15,0.72)",
+                  boxShadow: "0 18px 48px rgba(0,0,0,0.32)",
+                  padding: "26px 28px 30px",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 12, color: "#34d399", fontWeight: 900, marginBottom: 26 }}>
+                  <IconActivity size={18} style={{ color: "#34d399" }} />
+                  <span style={{ fontSize: 15 }}>{language === "zh" ? "实战遥测" : "LIVE TELEMETRY"}</span>
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+                  <MissionMeter
+                    label={language === "zh" ? "护甲强度" : "ARMOR INTEGRITY"}
+                    value={player.armorPointBalance}
+                    maxValue={20}
+                    color="#34d399"
+                  />
+                  <MissionMeter
+                    label={language === "zh" ? "武器充能" : "WEAPON CHARGE"}
+                    value={player.weaponPointBalance}
+                    maxValue={20}
+                    color="#22d3ee"
+                  />
+                </div>
+                <div style={{ height: 1, background: "rgba(255,255,255,0.08)", margin: "28px 0 22px" }} />
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 14, fontWeight: 800 }}>
+                  <span style={{ color: "#8190a5" }}>{language === "zh" ? "撤离成功率：" : "EXTRACTION CHANCE:"}</span>
+                  <span style={{ color: "#fff" }}>{extractionChance}%</span>
+                </div>
+              </div>
+
+              <div
+                style={{
+                  borderRadius: 26,
+                  border: "1px solid rgba(255,255,255,0.06)",
+                  background: "rgba(4,7,10,0.72)",
+                  padding: "28px",
+                  flex: 1,
+                }}
+              >
+                <div style={{ fontSize: 15, color: "#94a3b8", fontWeight: 900, marginBottom: 24 }}>
+                  {language === "zh" ? "任务简报" : "MISSION BRIEF"}
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 24, color: "#a8b3c4", fontSize: 15, lineHeight: 1.8 }}>
+                  <MissionBriefItem label={language === "zh" ? "坐标" : "Coordinates"} value="Sector Delta-09" />
+                  <MissionBriefItem label={language === "zh" ? "威胁等级" : "Threat Level"} value={getMissionThreatLabel(state.currentArea, t)} />
+                  <MissionBriefItem
+                    label={language === "zh" ? "提取状态" : "Extraction Status"}
+                    value={state.status === "pending_battle" ? getMissionTerminalState(language, "hostile") : getMissionTerminalState(language, "verify")}
+                  />
+                  {player.onChainLootItems.length > 0 ? (
+                    <MissionBriefItem
+                      label={language === "zh" ? "已获战利品" : "Recovered Loot"}
+                      value={String(player.onChainLootItems.length)}
+                    />
+                  ) : null}
+                </div>
+                <div style={{ marginTop: 42, fontSize: 13, color: "#11895c", fontWeight: 900, textTransform: "uppercase" }}>
+                  LINK_ESTABLISHED...
+                </div>
+              </div>
+            </div>
+
+            <div
+              style={{
+                borderRadius: 34,
+                border: "1px solid rgba(255,255,255,0.08)",
+                background: "rgba(4,7,10,0.8)",
+                display: "flex",
+                flexDirection: "column",
+                minHeight: "calc(100vh - 170px)",
+                overflow: "hidden",
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  padding: "22px 28px",
+                  borderBottom: "1px solid rgba(255,255,255,0.08)",
+                  color: "#64748b",
+                  fontSize: 16,
+                  fontWeight: 800,
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#34d399" }}>
+                  <IconRadio size={16} style={{ color: "#34d399" }} />
+                </div>
+                <span style={{ letterSpacing: "0.03em" }}>SECURE_TERMINAL_ACTIVE</span>
+              </div>
+
+              <div style={{ padding: "56px 46px 28px", display: "flex", flexDirection: "column", gap: 28, flex: 1 }}>
+                <div style={{ fontSize: 20, color: "#0f7d5b", fontWeight: 900, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+                  &gt;&gt; {language === "zh" ? "潜入流程已启动..." : "INFILTRATION SEQUENCE INITIATED..."}
+                </div>
+
+                {actionError ? (
+                  <div style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.24)", borderRadius: 18, padding: "14px 18px", color: "#fca5a5", fontSize: 14 }}>
+                    {formatPlayError(actionError, t)}
+                  </div>
+                ) : null}
+
+                {showTimeoutWarning ? (
+                  <div style={{ background: "rgba(245,158,11,0.08)", border: "1px solid rgba(245,158,11,0.24)", borderRadius: 18, padding: "14px 18px", color: "#fcd34d", fontSize: 14 }}>
+                    {t.play.timeoutWarning.replace("{seconds}", String(timeoutRemainingSeconds))}
+                  </div>
+                ) : null}
+
+                <div
+                  style={{
+                    maxWidth: 920,
+                    borderRadius: 24,
+                    border: "1px solid rgba(255,255,255,0.09)",
+                    background: "rgba(255,255,255,0.04)",
+                    padding: "24px 26px",
+                  }}
+                >
+                  <div style={{ fontSize: 16, color: "#34d399", fontWeight: 900, marginBottom: 12 }}>DELTA_HQ &gt;</div>
+                  <div style={{ fontSize: 17, lineHeight: 1.75, color: "#d5dde8", fontWeight: 700 }}>{missionNarrative}</div>
+                </div>
+
+                {player.onChainLootItems.length > 0 ? (
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14 }}>
+                    {player.onChainLootItems.map((item) => (
+                      <div
+                        key={item.assetId}
+                        style={{
+                          borderRadius: 18,
+                          border: "1px solid rgba(255,255,255,0.08)",
+                          background: "rgba(255,255,255,0.03)",
+                          padding: "16px 18px",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 10,
+                        }}
+                      >
+                        <div style={{ fontSize: 11, color: item.rarity === "legendary" ? "#f59e0b" : item.rarity === "epic" ? "#a855f7" : "#34d399", fontWeight: 900, textTransform: "uppercase" }}>
+                          {item.rarity === "legendary" ? t.play.legendary : item.rarity === "epic" ? t.play.epic : t.play.rare}
+                        </div>
+                        <strong style={{ color: "#fff", fontSize: 15, lineHeight: 1.45 }}>{translateLootLabel(item.label, t)}</strong>
+                        {player.onChainSafeCaseCapacity > 0 ? (
+                          <button
+                            disabled={busyAction !== null || updatingSafeCase}
+                            onClick={() => void handleToggleSafeCase(item.assetId)}
+                            style={{
+                              marginTop: "auto",
+                              minHeight: 38,
+                              borderRadius: 10,
+                              border: "1px solid rgba(52,211,153,0.24)",
+                              background: player.onChainSafeCaseItems.includes(item.assetId) ? "rgba(52,211,153,0.92)" : "rgba(52,211,153,0.08)",
+                              color: player.onChainSafeCaseItems.includes(item.assetId) ? "#04120c" : "#34d399",
+                              fontWeight: 900,
+                              cursor: busyAction !== null || updatingSafeCase ? "not-allowed" : "pointer",
+                            }}
+                          >
+                            {player.onChainSafeCaseItems.includes(item.assetId) ? t.play.safeCaseRemove : t.play.safeCaseKeep}
+                          </button>
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+
+                <div style={{ marginTop: "auto", borderTop: "1px solid rgba(255,255,255,0.08)", paddingTop: 24, display: "flex", flexDirection: "column", gap: 16 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 18 }}>
+                    {state.status === "pending_battle" ? (
+                      <>
+                        <MissionActionButton
+                          label={busyAction === "fight" ? t.play.engagingEnemy : getMissionPrimaryActionLabel(language, "fight")}
+                          disabled={busyAction !== null}
+                          onClick={() => void handleRaidAction("fight")}
+                        />
+                        <MissionActionButton
+                          label={secondaryActionLabel}
+                          disabled={busyAction !== null}
+                          onClick={() => void handleAbandonRaid()}
+                        />
+                      </>
+                    ) : (
+                      <>
+                        <MissionActionButton
+                          label={busyAction === "open" ? t.play.openingContainer : getMissionPrimaryActionLabel(language, "open")}
+                          disabled={busyAction !== null}
+                          onClick={() => void handleRaidAction("open")}
+                        />
+                        <MissionActionButton
+                          label={secondaryActionLabel}
+                          disabled={busyAction !== null}
+                          onClick={() => void (state.currentArea === "low" ? handleRaidAction("move") : handleRaidAction("extract"))}
+                        />
+                      </>
+                    )}
+                  </div>
+
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16 }}>
+                    <button
+                      type="button"
+                      disabled={busyAction !== null}
+                      onClick={() => void handleAbandonRaid()}
+                      style={{
+                        minHeight: 38,
+                        padding: "0 14px",
+                        borderRadius: 10,
+                        border: "1px solid rgba(239,68,68,0.18)",
+                        background: "rgba(239,68,68,0.06)",
+                        color: "rgba(248,113,113,0.78)",
+                        fontWeight: 800,
+                        cursor: busyAction !== null ? "not-allowed" : "pointer",
+                      }}
+                    >
+                      {busyAction === "abandon" ? t.play.abandoningRaid : t.play.abandonRaid}
+                    </button>
+                    <div style={{ fontSize: 12, color: "#64748b", fontWeight: 800 }}>
+                      {player.onChainSafeCaseCapacity > 0
+                        ? t.play.safeCaseAuto
+                            .replace("{count}", String(player.onChainSafeCaseItems.length))
+                            .replace("{capacity}", String(player.onChainSafeCaseCapacity))
+                        : t.play.noLootYet}
+                    </div>
+                  </div>
+
+                  {player.lastTransactionDebug ? (
+                    <details style={{ marginTop: 4 }}>
+                      <summary style={{ fontSize: 12, color: "#64748b", cursor: "pointer" }}>Transaction Debug</summary>
+                      <pre style={{ fontSize: 11, color: "#718096", marginTop: 8, overflowX: "auto" }}>
+                        {JSON.stringify(player.lastTransactionDebug, null, 2)}
+                      </pre>
+                    </details>
+                  ) : null}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <footer style={{ height: 4, background: "linear-gradient(to right, transparent, rgba(52,211,153,0.15), transparent)", flexShrink: 0, marginTop: "auto" }} />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <main className="shell">
       <header className="topbar">
@@ -1047,6 +1375,154 @@ function buildTacticalFeedPath(frame: number, amplitudeScale = 1) {
       return `${index === 0 ? "M" : "L"}${(index * step).toFixed(2)} ${normalizedValue.toFixed(2)}`;
     })
     .join(" ");
+}
+
+function getMissionExtractionChance(area: "low" | "medium" | "high", hostileContact: boolean) {
+  if (hostileContact) return 22;
+  if (area === "low") return 50;
+  if (area === "medium") return 37;
+  return 28;
+}
+
+function getMissionThreatLabel(area: "low" | "medium" | "high", t: ReturnType<typeof useI18n>["t"]) {
+  if (area === "high") return t.play.highRisk;
+  if (area === "medium") return t.play.mediumRisk;
+  return t.play.lowRisk;
+}
+
+function getMissionTerminalState(language: Language, kind: "verify" | "hostile") {
+  if (language === "zh") {
+    return kind === "hostile" ? "遭遇敌对目标" : "待验证";
+  }
+  return kind === "hostile" ? "Hostile Contact" : "Awaiting Verification";
+}
+
+function getMissionNarrative(language: Language, area: "low" | "medium" | "high", hostileContact: boolean, hasLoot: boolean) {
+  if (language === "zh") {
+    if (hostileContact) {
+      return "热源和移动信号同时抬升。观测塔周围发现敌对单位，链路建议立刻交战清除威胁，否则撤回当前路线。";
+    }
+    if (area === "medium" || area === "high") {
+      return hasLoot
+        ? "你已穿过外环观察点，终端记录到物资回收成功。前方仍存在可疑通信节点，可以继续深入，也可以立即发起撤离。"
+        : "你已绕过前方观测塔并接近核心区外围。雷达回波稳定，但补给点仍未完全确认，建议谨慎推进或就地撤离。";
+    }
+    return "系统初始化完成。你已成功降落在 Delta-09 扇区边缘。前方发现一座废弃的观测塔，雷达显示那里有微弱的补给信号。";
+  }
+
+  if (hostileContact) {
+    return "Thermal and motion signatures just spiked around the watchtower. Hostile contact is confirmed. Clear the threat now or break the route before the corridor collapses.";
+  }
+  if (area === "medium" || area === "high") {
+    return hasLoot
+      ? "You breached the outer perimeter and recovered material from the route. A weak terminal relay is still pulsing ahead. Push deeper or trigger extraction from your current position."
+      : "You bypassed the outer watchtower and reached the approach to the core sector. Radar remains stable, but the supply marker is still unresolved. Advance carefully or extract now.";
+  }
+  return "System boot complete. You touched down on the edge of Sector Delta-09. An abandoned watchtower is standing ahead, and radar is picking up a weak supply signal inside.";
+}
+
+function getMissionPrimaryActionLabel(language: Language, action: "open" | "fight") {
+  if (language === "zh") {
+    return action === "fight" ? "正面接敌，清除威胁" : "潜入观测塔寻找物资";
+  }
+  return action === "fight" ? "Engage hostile contact" : "Infiltrate the tower for supplies";
+}
+
+function getMissionSecondaryActionLabel(language: Language, action: "advance" | "extract" | "retreat") {
+  if (language === "zh") {
+    if (action === "advance") return "绕过观测塔，直接前往核心区";
+    if (action === "extract") return "锁定当前路径，直接发起撤离";
+    return "中止当前路线，立即后撤";
+  }
+  if (action === "advance") return "Bypass the tower and advance to core sector";
+  if (action === "extract") return "Lock the route and trigger extraction";
+  return "Abort the route and retreat";
+}
+
+function MissionMeter({
+  label,
+  value,
+  maxValue,
+  color,
+}: {
+  label: string;
+  value: number;
+  maxValue: number;
+  color: string;
+}) {
+  const safeValue = Number.isFinite(value) ? value : 0;
+  const fill = Math.max(0, Math.min(100, (safeValue / maxValue) * 100));
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12 }}>
+        <span style={{ fontSize: 14, color: "#93a0b3", fontWeight: 800 }}>{label}</span>
+        <span style={{ fontSize: 14, color: "#fff", fontWeight: 900 }}>
+          {safeValue.toFixed(1)} / {maxValue.toFixed(1)}
+        </span>
+      </div>
+      <div style={{ width: "100%", height: 8, borderRadius: 999, background: "rgba(255,255,255,0.08)", overflow: "hidden" }}>
+        <div
+          style={{
+            width: `${fill}%`,
+            height: "100%",
+            borderRadius: 999,
+            background: color,
+            boxShadow: `0 0 18px ${color}`,
+          }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function MissionBriefItem({ label, value }: { label: string; value: string }) {
+  return (
+    <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+      <span style={{ color: "#d1d8e4", lineHeight: 1.7 }}>•</span>
+      <div>
+        <span style={{ color: "#d1d8e4", fontWeight: 700 }}>{label}：</span>
+        <span>{value}</span>
+      </div>
+    </div>
+  );
+}
+
+function MissionActionButton({
+  label,
+  disabled,
+  onClick,
+}: {
+  label: string;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      style={{
+        minHeight: 74,
+        padding: "0 28px",
+        borderRadius: 18,
+        border: "1px solid rgba(16,185,129,0.3)",
+        background: "rgba(3,19,12,0.88)",
+        color: "#34d399",
+        fontSize: 16,
+        fontWeight: 900,
+        textAlign: "left",
+        cursor: disabled ? "not-allowed" : "pointer",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        transition: "all 0.2s",
+        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.02)",
+      }}
+    >
+      <span>{label}</span>
+      <span style={{ fontSize: 28, lineHeight: 1, color: "rgba(52,211,153,0.55)" }}>›</span>
+    </button>
+  );
 }
 
 function isRaidAlreadyActiveError(error: unknown) {
@@ -1352,6 +1828,15 @@ function IconShield({ size = 18, style }: { size?: number; style?: React.CSSProp
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={style}>
       <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
+    </svg>
+  );
+}
+
+function IconArrowLeft({ size = 18, style }: { size?: number; style?: React.CSSProperties }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" style={style}>
+      <path d="m15 18-6-6 6-6" />
+      <path d="M21 12H9" />
     </svg>
   );
 }
