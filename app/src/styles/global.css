@@ -1072,6 +1072,24 @@ summary {
   }
 }
 
+@keyframes tacticalSweep {
+  0% {
+    transform: translateX(-65%);
+  }
+  100% {
+    transform: translateX(65%);
+  }
+}
+
+@keyframes tacticalVerticalScan {
+  0% {
+    transform: translateY(-100%);
+  }
+  100% {
+    transform: translateY(100%);
+  }
+}
+
 @media (max-width: 1180px) {
   .dashboard-home-shell {
     width: min(1120px, calc(100vw - 32px));

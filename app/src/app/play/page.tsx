@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import Link from "next/link";
 import { useEffect, useMemo, useReducer, useState } from "react";
 
@@ -19,6 +19,7 @@ export default function PlayPage() {
   const player = usePlayerProfile();
   const { t } = useI18n();
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const [feedFrame, setFeedFrame] = useState(0);
   const [actionError, setActionError] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<null | "start" | "open" | "move" | "fight" | "extract" | "abandon" | "buy-armor" | "buy-weapon">(null);
   const [hasLocalActiveRaid, setHasLocalActiveRaid] = useState(false);
@@ -53,6 +54,29 @@ export default function PlayPage() {
     timeoutRemainingSeconds > 0 &&
     timeoutRemainingSeconds <= 30 &&
     (state.status === "active" || state.status === "pending_battle");
+  const headerActionStyle: CSSProperties = {
+    minHeight: "48px",
+    padding: "0 18px",
+    borderRadius: "12px",
+    border: "1px solid rgba(255,255,255,0.08)",
+    background: "rgba(255,255,255,0.03)",
+    color: "#c0ccd8",
+    textDecoration: "none",
+    textTransform: "uppercase",
+    letterSpacing: "0.05em",
+    fontSize: "11px",
+    fontWeight: 900,
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    transition: "all 0.2s",
+    boxShadow: "inset 0 1px 0 rgba(255,255,255,0.03)",
+  };
+  const tacticalFeedPath = useMemo(() => buildTacticalFeedPath(feedFrame), [feedFrame]);
+  const tacticalFeedGhostPath = useMemo(
+    () => buildTacticalFeedPath((feedFrame + TACTICAL_FEED_PATTERNS.length - 1) % TACTICAL_FEED_PATTERNS.length, 0.74),
+    [feedFrame],
+  );
 
   const raidStatusLabel = useMemo(() => {
     if (busyAction === "start") return t.play.deploying;
@@ -77,6 +101,13 @@ export default function PlayPage() {
     setSafeCaseCapacity(0);
     dispatch({ type: "reset" });
   }, [player.walletAddress]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setFeedFrame((current) => (current + 1) % TACTICAL_FEED_PATTERNS.length);
+    }, 900);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if (!hasActiveRaid || !player.onChainRaidStartedAt) {
@@ -349,25 +380,10 @@ export default function PlayPage() {
             </div>
 
             <div style={{ display: "flex", gap: "10px", alignItems: "center", justifyContent: "flex-end" }}>
-              <Link
-                href="/"
-                style={{
-                  background: "rgba(255,255,255,0.03)",
-                  border: "1px solid rgba(255,255,255,0.08)",
-                  padding: "8px 16px",
-                  borderRadius: "4px",
-                  fontSize: "10px",
-                  fontWeight: 900,
-                  color: "#94a3b8",
-                  textDecoration: "none",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                  transition: "all 0.2s",
-                }}
-              >
+              <Link href="/" style={headerActionStyle}>
                 {t.common.backHome}
               </Link>
-              <LanguageToggle />
+              <LanguageToggle style={headerActionStyle} />
             </div>
           </header>
 
@@ -576,6 +592,26 @@ export default function PlayPage() {
                 <div
                   style={{
                     position: "absolute",
+                    inset: 0,
+                    opacity: 0.16,
+                    background:
+                      "linear-gradient(90deg, transparent 0%, rgba(52,211,153,0.03) 35%, rgba(52,211,153,0.2) 50%, rgba(52,211,153,0.03) 65%, transparent 100%)",
+                    animation: "tacticalSweep 3s linear infinite",
+                  }}
+                />
+                <div
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    opacity: 0.22,
+                    background:
+                      "linear-gradient(180deg, transparent 0%, rgba(52,211,153,0.14) 48%, rgba(52,211,153,0.02) 60%, transparent 100%)",
+                    animation: "tacticalVerticalScan 5.5s linear infinite",
+                  }}
+                />
+                <div
+                  style={{
+                    position: "absolute",
                     top: 14,
                     left: 14,
                     border: "1px solid rgba(52,211,153,0.3)",
@@ -591,8 +627,56 @@ export default function PlayPage() {
                 >
                   TACTICAL FEED
                 </div>
-                <svg viewBox="0 0 200 100" style={{ width: "75%", color: "rgba(52,211,153,0.3)" }}>
-                  <path d="M0 50 L40 50 L50 20 L60 80 L70 50 L120 50 L130 10 L140 90 L150 50 L200 50" fill="none" stroke="currentColor" strokeWidth="1.5" />
+                <svg viewBox="0 0 200 100" style={{ width: "75%", overflow: "visible" }}>
+                  <defs>
+                    <filter id="tactical-feed-glow">
+                      <feGaussianBlur stdDeviation="1.8" result="blur" />
+                      <feMerge>
+                        <feMergeNode in="blur" />
+                        <feMergeNode in="SourceGraphic" />
+                      </feMerge>
+                    </filter>
+                  </defs>
+                  <path
+                    d={tacticalFeedGhostPath}
+                    fill="none"
+                    stroke="rgba(52,211,153,0.18)"
+                    strokeWidth="1.2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path d="M0 50 L200 50" fill="none" stroke="rgba(148,163,184,0.12)" strokeWidth="0.7" strokeDasharray="4 4" />
+                  <path
+                    d={tacticalFeedPath}
+                    fill="none"
+                    stroke="rgba(52,211,153,0.25)"
+                    strokeWidth="5"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    filter="url(#tactical-feed-glow)"
+                  />
+                  <path
+                    d={tacticalFeedPath}
+                    fill="none"
+                    stroke="rgba(52,211,153,0.72)"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    style={{ transition: "d 240ms ease, opacity 240ms ease" }}
+                  />
+                  {TACTICAL_FEED_PING_POINTS.map((point, index) => (
+                    <circle
+                      key={`${point.x}-${index}`}
+                      cx={point.x}
+                      cy={point.y}
+                      r="1.2"
+                      fill="rgba(52,211,153,0.85)"
+                      style={{
+                        opacity: (feedFrame + index) % 3 === 0 ? 0.9 : 0.18,
+                        transition: "opacity 180ms ease",
+                      }}
+                    />
+                  ))}
                 </svg>
                 <div
                   style={{
@@ -935,6 +1019,34 @@ export default function PlayPage() {
       </section>
     </main>
   );
+}
+
+const TACTICAL_FEED_PATTERNS = [
+  [50, 50, 50, 50, 50, 50, 24, 78, 50, 50, 50, 50, 50, 14, 86, 50, 50, 50],
+  [50, 50, 50, 50, 38, 18, 50, 74, 50, 50, 50, 42, 20, 50, 84, 50, 50, 50],
+  [50, 50, 50, 46, 22, 50, 80, 50, 50, 50, 36, 50, 18, 50, 72, 50, 50, 50],
+  [50, 50, 44, 18, 50, 82, 50, 50, 50, 34, 50, 50, 16, 50, 78, 50, 50, 50],
+  [50, 50, 50, 50, 26, 50, 74, 50, 50, 50, 50, 44, 12, 50, 70, 50, 50, 50],
+];
+
+const TACTICAL_FEED_PING_POINTS = [
+  { x: 18, y: 50 },
+  { x: 56, y: 50 },
+  { x: 90, y: 50 },
+  { x: 124, y: 50 },
+  { x: 158, y: 50 },
+  { x: 188, y: 50 },
+];
+
+function buildTacticalFeedPath(frame: number, amplitudeScale = 1) {
+  const values = TACTICAL_FEED_PATTERNS[frame] ?? TACTICAL_FEED_PATTERNS[0];
+  const step = 200 / (values.length - 1);
+  return values
+    .map((value, index) => {
+      const normalizedValue = 50 + (value - 50) * amplitudeScale;
+      return `${index === 0 ? "M" : "L"}${(index * step).toFixed(2)} ${normalizedValue.toFixed(2)}`;
+    })
+    .join(" ");
 }
 
 function isRaidAlreadyActiveError(error: unknown) {

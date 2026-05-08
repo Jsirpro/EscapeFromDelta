@@ -63,7 +63,7 @@ export function PlayerHUD() {
         <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: "16px" }}>
           <StatBar label={t.dashboard.armorIntegrity} current={player.armorPointBalance} max={100} color="var(--accent)" pct={armorPct} />
           <StatBar label={t.dashboard.weaponCharge} current={player.weaponPointBalance} max={100} color="#f59e0b" pct={weaponPct} />
-          <StatBar label={t.dashboard.neuralSync} current={corePct} max={100} color="#06b6d4" pct={corePct} />
+          {/* <StatBar label={t.dashboard.neuralSync} current={corePct} max={100} color="#06b6d4" pct={corePct} /> */}
         </div>
       </div>
 
