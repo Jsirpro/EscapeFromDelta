@@ -9,6 +9,9 @@ const LAMPORTS_PER_SOL = 1_000_000_000;
 const DEFAULT_SAFE_CASE_CAPACITY = 0;
 
 type ProgramAccountNamespace = {
+  gameConfig: {
+    fetch(address: anchor.web3.PublicKey): Promise<any>;
+  };
   playerProfile: {
     fetch(address: anchor.web3.PublicKey): Promise<any>;
     fetchNullable(address: anchor.web3.PublicKey): Promise<any | null>;
@@ -29,9 +32,7 @@ export async function ensureLocalDemoSetup(options: { includeServerPlayer?: bool
   const includeServerPlayer = options.includeServerPlayer ?? true;
 
   const gameConfig = deriveGameConfig();
-  const adminProfile = deriveAdminProfile(wallet);
   const playerProfile = derivePlayerProfile(wallet);
-  const difficultyConfiguration = deriveDifficulty(wallet);
 
   if (!(await accountExists(provider.connection, gameConfig))) {
     const transaction = await program.methods
@@ -45,18 +46,11 @@ export async function ensureLocalDemoSetup(options: { includeServerPlayer?: bool
     await sendServerTransaction(provider, transaction);
   }
 
-  if (!(await accountExists(provider.connection, adminProfile))) {
-    const transaction = await program.methods
-      .initializeAdminProfile()
-      .accounts({
-        gameConfig,
-        adminProfile,
-        deployer: wallet,
-        systemProgram: anchor.web3.SystemProgram.programId,
-      })
-      .transaction();
-    await sendServerTransaction(provider, transaction);
-  }
+  const gameConfigAccount = await accounts(program).gameConfig.fetch(gameConfig);
+  const adminAuthority = new anchor.web3.PublicKey(gameConfigAccount.adminAuthority);
+  const usesExternalAdminConfig = !adminAuthority.equals(wallet);
+  const adminProfile = deriveAdminProfile(adminAuthority);
+  let difficultyConfiguration = deriveDifficulty(adminAuthority);
 
   if (includeServerPlayer && !(await accountExists(provider.connection, playerProfile))) {
     const transaction = await program.methods
@@ -71,18 +65,35 @@ export async function ensureLocalDemoSetup(options: { includeServerPlayer?: bool
     await sendServerTransaction(provider, transaction);
   }
 
-  if (!(await accountExists(provider.connection, difficultyConfiguration))) {
+  if (!usesExternalAdminConfig && !(await accountExists(provider.connection, adminProfile))) {
+    const transaction = await program.methods
+      .initializeAdminProfile()
+      .accounts({
+        gameConfig,
+        adminProfile,
+        deployer: wallet,
+        systemProgram: anchor.web3.SystemProgram.programId,
+      })
+      .transaction();
+    await sendServerTransaction(provider, transaction);
+  }
+
+  if (!usesExternalAdminConfig && !(await accountExists(provider.connection, difficultyConfiguration))) {
     const transaction = await program.methods
       .createDifficultyVersion(new anchor.BN(1000), 10, 30, 50)
       .accounts({
         gameConfig,
         adminProfile,
         difficultyConfiguration,
-        admin: wallet,
+        admin: adminAuthority,
         systemProgram: anchor.web3.SystemProgram.programId,
       })
       .transaction();
     await sendServerTransaction(provider, transaction);
+  }
+
+  if (usesExternalAdminConfig && !(await accountExists(provider.connection, difficultyConfiguration))) {
+    difficultyConfiguration = anchor.web3.PublicKey.default;
   }
 
   return { provider, program, wallet, gameConfig, adminProfile, playerProfile, difficultyConfiguration };
@@ -503,9 +514,9 @@ export async function settleLocalDemoRaid(result: "succeeded" | "failed") {
 
 function getProvider() {
   process.env.ANCHOR_PROVIDER_URL = RPC_URL;
-  process.env.ANCHOR_WALLET =
-    process.env.ANCHOR_WALLET ??
-    `${process.env.HOME}/.config/solana/dev.json`;
+  process.env.ANCHOR_WALLET = resolveWalletPath(
+    process.env.ANCHOR_WALLET ?? `${process.env.HOME}/.config/solana/dev.json`,
+  );
   return anchor.AnchorProvider.local(RPC_URL, {
     commitment: "confirmed",
     preflightCommitment: "confirmed",
@@ -514,7 +525,10 @@ function getProvider() {
 
 function getProgram(provider: anchor.AnchorProvider) {
   anchor.setProvider(provider);
-  return new anchor.Program(idl as anchor.Idl, provider);
+  return new anchor.Program(
+    { ...(idl as anchor.Idl), address: PROGRAM_ID.toBase58() } as anchor.Idl,
+    provider,
+  );
 }
 
 function accounts(program: anchor.Program) {
@@ -588,6 +602,13 @@ async function waitForSignatureStatus(
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function resolveWalletPath(walletPath: string) {
+  if (walletPath.startsWith("~/")) {
+    return `${process.env.HOME}/${walletPath.slice(2)}`;
+  }
+  return walletPath;
 }
 
 function deriveGameConfig() {

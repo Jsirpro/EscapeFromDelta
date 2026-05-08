@@ -701,7 +701,10 @@ async function buildDirectSettlementTransaction(
     connection,
     publicKey: playerKey,
   } as anchor.AnchorProvider;
-  const program = new anchor.Program(idl as anchor.Idl, provider);
+  const program = new anchor.Program(
+    { ...(idl as anchor.Idl), address: PROGRAM_ID } as anchor.Idl,
+    provider,
+  );
   const playerAccount = (await program.account.playerProfile.fetch(playerProfile)) as {
     warehouseNonce: anchor.BN;
   };

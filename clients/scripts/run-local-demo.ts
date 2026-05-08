@@ -6,7 +6,9 @@ const RPC_URL = process.env.ANCHOR_PROVIDER_URL ?? process.env.RPC_URL ?? "http:
 
 async function main() {
   process.env.ANCHOR_PROVIDER_URL = RPC_URL;
-  process.env.ANCHOR_WALLET = process.env.ANCHOR_WALLET ?? `${process.env.HOME}/.config/solana/id.json`;
+  process.env.ANCHOR_WALLET = resolveWalletPath(
+    process.env.ANCHOR_WALLET ?? `${process.env.HOME}/.config/solana/id.json`,
+  );
 
   const provider = anchor.AnchorProvider.local(RPC_URL, {
     commitment: "confirmed",
@@ -14,7 +16,10 @@ async function main() {
   });
   anchor.setProvider(provider);
 
-  const program = new anchor.Program(idl as anchor.Idl, provider);
+  const program = new anchor.Program(
+    { ...(idl as anchor.Idl), address: PROGRAM_ID.toBase58() } as anchor.Idl,
+    provider,
+  );
   const wallet = provider.wallet.publicKey;
 
   const [gameConfig] = anchor.web3.PublicKey.findProgramAddressSync([Buffer.from("game_config")], PROGRAM_ID);
@@ -146,6 +151,13 @@ function u64(value: number) {
   const buffer = Buffer.alloc(8);
   buffer.writeBigUInt64LE(BigInt(value), 0);
   return buffer;
+}
+
+function resolveWalletPath(walletPath: string) {
+  if (walletPath.startsWith("~/")) {
+    return `${process.env.HOME}/${walletPath.slice(2)}`;
+  }
+  return walletPath;
 }
 
 main().catch((error) => {
