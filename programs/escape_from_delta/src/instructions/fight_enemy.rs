@@ -47,7 +47,6 @@ pub fn handler(
     require!(final_random_value > 0, EscapeError::InvalidRandomAudit);
 
     let now = Clock::get()?.unix_timestamp;
-    let player_profile = &mut ctx.accounts.player_profile;
     let raid_session = &mut ctx.accounts.raid_session;
 
     if crate::instructions::is_timed_out(raid_session.started_at, now) {
@@ -97,9 +96,7 @@ pub fn handler(
     raid_session.current_armor_tenths = 0;
     raid_session.current_weapon_tenths = 0;
     raid_session.pending_loot = None;
-    raid_session.carried_loot.clear();
-    raid_session.settled_at = Some(now);
-    player_profile.active_raid = None;
+    raid_session.settled_at = None;
     Ok((false, 0, 0))
 }
 

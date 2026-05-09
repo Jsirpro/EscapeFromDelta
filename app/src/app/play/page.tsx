@@ -197,9 +197,10 @@ export default function PlayPage() {
       }
       if (action === "fight") {
         const snapshot = await player.fightDemoEnemy();
-        if (snapshot?.raid?.status === "active" || snapshot?.profile?.activeRaid) {
+        if (snapshot?.raid?.status === "active") {
           dispatch({ type: "win" });
         } else {
+          setHasLocalActiveRaid(false);
           dispatch({ type: "fail" });
         }
         return;
@@ -224,12 +225,15 @@ export default function PlayPage() {
     setBusyAction("abandon");
     try {
       await player.settleDemoRaid("failed", player.onChainActiveRaid);
+      setForceReadyMode(true);
       setHasLocalActiveRaid(false);
-      dispatch({ type: "fail" });
+      dispatch({ type: "reset" });
     } catch (error) {
       const snapshot = await player.refreshRemote().catch(() => null);
-      dispatch({ type: "reset" });
       if (isNoActiveRaidError(error) || !snapshot?.profile?.activeRaid) {
+        setForceReadyMode(true);
+        setHasLocalActiveRaid(false);
+        dispatch({ type: "reset" });
         setActionError(null);
       } else {
         setActionError(error instanceof Error ? error.message : "abandon-raid-failed");
@@ -326,6 +330,10 @@ export default function PlayPage() {
 
   const isPreparingPhase = state.status === "preparing" || state.status === "transitioning" || showResumePrompt;
   const isMissionActivePhase = state.status === "active" || state.status === "pending_battle";
+  const hasUnsettledFailedRaid =
+    state.status === "failed" &&
+    Boolean(player.onChainActiveRaid) &&
+    (player.onChainRaidStatus === "failed" || player.onChainRaidStatus === "timed_out");
 
   if (isPreparingPhase) {
     return (
@@ -1298,7 +1306,24 @@ export default function PlayPage() {
               </>
             ) : null}
 
-            {state.status === "failed" || state.status === "succeeded" ? (
+            {state.status === "failed" ? (
+              <>
+                {hasUnsettledFailedRaid ? (
+                  <button className="button button-danger" disabled={busyAction !== null} type="button" onClick={() => void handleAbandonRaid()}>
+                    {busyAction === "abandon" ? t.play.abandoningRaid : t.play.abandonRaid}
+                  </button>
+                ) : (
+                  <button className="button" disabled={busyAction !== null} type="button" onClick={() => void handleResetToReady()}>
+                    {busyAction === "abandon" ? t.play.abandoningRaid : t.play.restartRaid}
+                  </button>
+                )}
+                <Link className="button button-secondary" href="/">
+                  {t.common.backHome}
+                </Link>
+              </>
+            ) : null}
+
+            {state.status === "succeeded" ? (
               <>
                 <button className="button" disabled={busyAction !== null} type="button" onClick={() => void handleResetToReady()}>
                   {busyAction === "abandon" ? t.play.abandoningRaid : t.play.restartRaid}
