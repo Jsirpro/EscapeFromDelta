@@ -6,7 +6,7 @@ resolution = true
 skip-lint = false
 
 [programs.devnet]
-escape_from_delta = "7ueVgYfrwidjpwMCBfGyHCoVpaVNe7Ep1h2Mxv1ENBYQ"
+escape_from_delta = "E3Axdx3hzXcZEmo7u4xLYXRtCQcUDtoRtioNwRmDPaKa"
 
 [registry]
 url = "https://api.apr.dev"

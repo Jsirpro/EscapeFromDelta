@@ -421,15 +421,14 @@ export async function buildSessionSelectSafeCaseTransaction(
 export async function buildMoveAreaTransaction(player: string, area: "low" | "medium" | "high") {
   const { provider, program } = await ensureLocalDemoSetup();
   const { playerKey, playerProfile, raidSessionAddress } = await getActiveRaid(program, player);
-  const transaction = await program.methods
-    .moveArea(riskLevelArg(area))
-    .accounts({
+  const transaction = new anchor.web3.Transaction().add(
+    createMoveAreaInstruction({
       signer: playerKey,
       playerProfile,
       raidSession: raidSessionAddress,
-      sessionToken: null,
-    })
-    .transaction();
+      area,
+    }),
+  );
   return finalizeTransaction(provider.connection, transaction, playerKey);
 }
 
@@ -443,15 +442,15 @@ export async function buildSessionMoveAreaTransaction(
   const sessionSignerKey = new anchor.web3.PublicKey(sessionSigner);
   const sessionTokenKey = new anchor.web3.PublicKey(sessionToken);
   const { playerProfile, raidSessionAddress } = await getActiveRaid(program, player);
-  const transaction = await program.methods
-    .moveArea(riskLevelArg(area))
-    .accounts({
+  const transaction = new anchor.web3.Transaction().add(
+    createMoveAreaInstruction({
       signer: sessionSignerKey,
       playerProfile,
       raidSession: raidSessionAddress,
       sessionToken: sessionTokenKey,
-    })
-    .transaction();
+      area,
+    }),
+  );
   return finalizeTransaction(provider.connection, transaction, sessionSignerKey);
 }
 
@@ -704,10 +703,45 @@ async function getExplicitRaid(program: anchor.Program, player: string, raidSess
   return { playerKey, playerProfile, raidSessionAddress: raidSessionKey, raidSession };
 }
 
-function riskLevelArg(area: "low" | "medium" | "high") {
-  if (area === "low") return { Low: {} };
-  if (area === "medium") return { Medium: {} };
-  return { High: {} };
+function createMoveAreaInstruction(args: {
+  signer: anchor.web3.PublicKey;
+  playerProfile: anchor.web3.PublicKey;
+  raidSession: anchor.web3.PublicKey;
+  area: "low" | "medium" | "high";
+  sessionToken?: anchor.web3.PublicKey;
+}) {
+  return new anchor.web3.TransactionInstruction({
+    programId: PROGRAM_ID,
+    keys: [
+      { pubkey: args.signer, isSigner: true, isWritable: true },
+      { pubkey: args.playerProfile, isSigner: false, isWritable: true },
+      { pubkey: args.raidSession, isSigner: false, isWritable: true },
+      ...(args.sessionToken
+        ? [{ pubkey: args.sessionToken, isSigner: false, isWritable: false }]
+        : []),
+    ],
+    data: encodeMoveAreaInstruction(args.area),
+  });
+}
+
+function encodeMoveAreaInstruction(area: "low" | "medium" | "high") {
+  return Buffer.concat([moveAreaDiscriminator(), Buffer.from([riskLevelIndex(area)])]);
+}
+
+function moveAreaDiscriminator() {
+  const instruction = (idl as { instructions?: Array<{ name: string; discriminator?: number[] }> }).instructions?.find(
+    ({ name }) => name === "move_area",
+  );
+  if (!instruction?.discriminator || instruction.discriminator.length !== 8) {
+    throw new Error("missing-move-area-discriminator");
+  }
+  return Buffer.from(instruction.discriminator);
+}
+
+function riskLevelIndex(area: "low" | "medium" | "high") {
+  if (area === "low") return 0;
+  if (area === "medium") return 1;
+  return 2;
 }
 
 async function accountExists(connection: anchor.web3.Connection, address: anchor.web3.PublicKey) {
