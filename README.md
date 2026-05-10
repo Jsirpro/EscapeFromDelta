@@ -4,6 +4,7 @@ Escape from Delta is a Solana-backed PVE extraction raid demo with EDcoins,
 warehouse assets, marketplace listings, battle records, and admin difficulty
 configuration.
 ![alt text](image.png)
+![alt text](image-1.png)
 
 ## Devnet Setup
 
