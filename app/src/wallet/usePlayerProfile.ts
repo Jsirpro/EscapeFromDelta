@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { formatTenths } from "../../../clients/src/queries/player";
 import type { BattleRecord, PlayerProfile, WarehouseAsset } from "../../../clients/src/types";
 import { fetchBrowserPlayerProfile, fetchBrowserRaidState } from "../lib/onchain";
+import type { LootDisplayItem } from "../lib/loot";
 
 import { useWalletState } from "./provider";
 
@@ -14,11 +15,7 @@ interface RemoteRaidPayload {
   safeCaseCapacity: number;
   safeCaseItems: string[];
   startedAt: number;
-  lootItems: Array<{
-    assetId: string;
-    rarity: "rare" | "epic" | "legendary";
-    label: string;
-  }>;
+  lootItems: LootDisplayItem[];
 }
 
 export function usePlayerProfile() {

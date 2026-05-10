@@ -46,7 +46,7 @@ export async function ensureLocalDemoSetup(options: { includeServerPlayer?: bool
     await sendServerTransaction(provider, transaction);
   }
 
-  const gameConfigAccount = await accounts(program).gameConfig.fetch(gameConfig);
+  const gameConfigAccount = await fetchWithRetry(() => accounts(program).gameConfig.fetch(gameConfig));
   const adminAuthority = new anchor.web3.PublicKey(gameConfigAccount.adminAuthority);
   const usesExternalAdminConfig = !adminAuthority.equals(wallet);
   const adminProfile = deriveAdminProfile(adminAuthority);
@@ -745,7 +745,46 @@ function riskLevelIndex(area: "low" | "medium" | "high") {
 }
 
 async function accountExists(connection: anchor.web3.Connection, address: anchor.web3.PublicKey) {
-  return (await connection.getAccountInfo(address)) !== null;
+  return (
+    (await fetchWithRetry(
+      () => connection.getAccountInfo(address),
+      { retries: 4, delayMs: 250 },
+    )) !== null
+  );
+}
+
+async function fetchWithRetry<T>(
+  fn: () => Promise<T>,
+  options: { retries?: number; delayMs?: number } = {},
+): Promise<T> {
+  const retries = options.retries ?? 3;
+  const delayMs = options.delayMs ?? 200;
+  let lastError: unknown;
+  for (let attempt = 0; attempt <= retries; attempt += 1) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error;
+      if (!isTransientRpcReadError(error) || attempt === retries) {
+        throw error;
+      }
+      await sleep(delayMs * (attempt + 1));
+    }
+  }
+  throw lastError instanceof Error ? lastError : new Error("rpc-read-failed");
+}
+
+function isTransientRpcReadError(error: unknown) {
+  if (!(error instanceof Error)) return false;
+  const message = error.message.toLowerCase();
+  return (
+    message.includes("failed to get info about account") ||
+    message.includes("failed to fetch") ||
+    message.includes("fetchfailed") ||
+    message.includes("network request failed") ||
+    message.includes("429") ||
+    message.includes("timed out")
+  );
 }
 
 function u16(value: number) {

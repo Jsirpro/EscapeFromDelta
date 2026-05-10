@@ -11,7 +11,7 @@ import { usePlayerProfile } from "../../wallet/usePlayerProfile";
 
 export default function WarehousePage() {
   const player = usePlayerProfile();
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const [listingPrices, setListingPrices] = useState<Record<string, string>>({});
   const collectibleAssets = player.warehouseAssets.filter((asset) => asset.assetType === "collectible");
   const tradableAssets = collectibleAssets.filter((asset) => asset.lockedState === "available");
@@ -126,44 +126,103 @@ export default function WarehousePage() {
                 <p style={{ color: "#64748b", marginTop: 24 }}>{t.warehouse.noCollectibles}</p>
               ) : (
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 18, marginTop: 28 }}>
-                  {collectibleGroups.map((item) => (
-                    <div
-                      key={`${item.collectibleCode}-${item.lockState}`}
-                      style={{
-                        borderRadius: 20,
-                        border: "1px solid rgba(255,255,255,0.08)",
-                        background: "rgba(0,0,0,0.28)",
-                        padding: "22px 22px 18px",
-                        minHeight: 168,
-                        display: "flex",
-                        flexDirection: "column",
-                        justifyContent: "space-between",
-                      }}
-                    >
-                      <div>
-                        <div style={{ fontSize: 12, color: "#94a3b8", fontWeight: 800, marginBottom: 8 }}>
-                          {item.rarity === "legendary" ? t.play.legendary : item.rarity === "epic" ? t.play.epic : t.play.rare}
-                        </div>
-                        <strong style={{ display: "block", fontSize: 24, lineHeight: 1.2, color: "#fff" }}>{translateWarehouseLabel(item.label, t)}</strong>
-                      </div>
+                  {collectibleGroups.map((item) => {
+                    const meta = item.meta;
+                    const name = meta ? (language === "zh" ? meta.nameCn : meta.nameEn) : translateWarehouseLabel(item.label, t);
+                    const description = meta ? (language === "zh" ? meta.descriptionCn : meta.descriptionEn) : null;
+                    return (
+                      <div
+                        key={`${item.collectibleCode}-${item.lockState}`}
+                        style={{
+                          borderRadius: 20,
+                          border: "1px solid rgba(255,255,255,0.08)",
+                          background: "rgba(0,0,0,0.28)",
+                          padding: "18px 18px 16px",
+                          minHeight: 168,
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 14,
+                        }}
+                      >
+                        {meta ? (
+                          <div
+                            style={{
+                              position: "relative",
+                              width: "100%",
+                              aspectRatio: "1 / 1",
+                              borderRadius: 14,
+                              overflow: "hidden",
+                              border: "1px solid rgba(255,255,255,0.06)",
+                              background: "#05080c",
+                            }}
+                          >
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={meta.image}
+                              alt={name}
+                              loading="lazy"
+                              style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                            />
+                            {item.count > 1 ? (
+                              <span
+                                style={{
+                                  position: "absolute",
+                                  right: 10,
+                                  bottom: 10,
+                                  padding: "4px 10px",
+                                  borderRadius: 999,
+                                  background: "rgba(0,0,0,0.72)",
+                                  color: "#fff",
+                                  fontWeight: 900,
+                                  fontSize: 13,
+                                  letterSpacing: "0.04em",
+                                }}
+                              >
+                                x{item.count}
+                              </span>
+                            ) : null}
+                          </div>
+                        ) : null}
 
-                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", marginTop: 24 }}>
-                        <span style={{ fontSize: 16, color: "#94a3b8" }}>X{item.count}</span>
-                        <span
-                          style={{
-                            padding: "8px 14px",
-                            borderRadius: 10,
-                            border: "1px solid rgba(16,185,129,0.24)",
-                            color: item.lockState === "available" ? "#34d399" : "#94a3b8",
-                            background: item.lockState === "available" ? "rgba(16,185,129,0.08)" : "rgba(255,255,255,0.03)",
-                            fontWeight: 800,
-                          }}
-                        >
-                          {translateLockState(item.lockState, t)}
-                        </span>
+                        <div>
+                          <div style={{ fontSize: 12, color: "#94a3b8", fontWeight: 800, marginBottom: 6 }}>
+                            {item.rarity === "legendary" ? t.play.legendary : item.rarity === "epic" ? t.play.epic : t.play.rare}
+                          </div>
+                          <strong style={{ display: "block", fontSize: 20, lineHeight: 1.25, color: "#fff" }}>{name}</strong>
+                          {description ? (
+                            <p
+                              style={{
+                                marginTop: 8,
+                                marginBottom: 0,
+                                color: "#94a3b8",
+                                fontSize: 13,
+                                lineHeight: 1.55,
+                              }}
+                            >
+                              {description}
+                            </p>
+                          ) : null}
+                        </div>
+
+                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "auto" }}>
+                          {!meta ? <span style={{ fontSize: 14, color: "#94a3b8" }}>x{item.count}</span> : <span />}
+                          <span
+                            style={{
+                              padding: "6px 12px",
+                              borderRadius: 10,
+                              border: "1px solid rgba(16,185,129,0.24)",
+                              color: item.lockState === "available" ? "#34d399" : "#94a3b8",
+                              background: item.lockState === "available" ? "rgba(16,185,129,0.08)" : "rgba(255,255,255,0.03)",
+                              fontWeight: 800,
+                              fontSize: 13,
+                            }}
+                          >
+                            {translateLockState(item.lockState, t)}
+                          </span>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </Panel>
@@ -179,6 +238,9 @@ export default function WarehousePage() {
                     const display = asset.collectibleCode
                       ? deriveCollectibleDisplayFromCode(asset.collectibleCode, asset.address)
                       : deriveCollectibleDisplay(asset.address);
+                    const meta = display.meta;
+                    const name = meta ? (language === "zh" ? meta.nameCn : meta.nameEn) : translateWarehouseLabel(display.label, t);
+                    const description = meta ? (language === "zh" ? meta.descriptionCn : meta.descriptionEn) : null;
                     const priceValue = listingPrices[asset.address] ?? "";
                     const parsedPrice = Number.parseInt(priceValue || "0", 10);
                     const feePreview = Number.isFinite(parsedPrice) && parsedPrice > 0 ? Math.ceil(parsedPrice * 0.03) : 0;
@@ -196,14 +258,44 @@ export default function WarehousePage() {
                           gap: 18,
                         }}
                       >
-                        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                          <div>
-                            <div style={{ fontSize: 12, color: "#94a3b8", fontWeight: 800, marginBottom: 10 }}>
-                              {display.rarity === "legendary" ? t.play.legendary : display.rarity === "epic" ? t.play.epic : t.play.rare}
+                        <div style={{ display: "flex", gap: 18, alignItems: "flex-start" }}>
+                          {meta ? (
+                            <div
+                              style={{
+                                flex: "0 0 112px",
+                                width: 112,
+                                height: 112,
+                                borderRadius: 16,
+                                overflow: "hidden",
+                                border: "1px solid rgba(255,255,255,0.08)",
+                                background: "#05080c",
+                              }}
+                            >
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={meta.image}
+                                alt={name}
+                                loading="lazy"
+                                style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                              />
                             </div>
-                            <strong style={{ display: "block", fontSize: 24, lineHeight: 1.2, color: "#fff" }}>{translateWarehouseLabel(display.label, t)}</strong>
+                          ) : null}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
+                              <div>
+                                <div style={{ fontSize: 12, color: "#94a3b8", fontWeight: 800, marginBottom: 8 }}>
+                                  {display.rarity === "legendary" ? t.play.legendary : display.rarity === "epic" ? t.play.epic : t.play.rare}
+                                </div>
+                                <strong style={{ display: "block", fontSize: 22, lineHeight: 1.2, color: "#fff" }}>{name}</strong>
+                              </div>
+                              <IconCube size={24} style={{ color: "rgba(16,185,129,0.28)", flexShrink: 0 }} />
+                            </div>
+                            {description ? (
+                              <p style={{ marginTop: 10, marginBottom: 0, color: "#94a3b8", fontSize: 13, lineHeight: 1.55 }}>
+                                {description}
+                              </p>
+                            ) : null}
                           </div>
-                          <IconCube size={28} style={{ color: "rgba(16,185,129,0.28)" }} />
                         </div>
 
                         <div>

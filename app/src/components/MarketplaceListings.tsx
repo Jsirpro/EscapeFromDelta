@@ -21,7 +21,7 @@ interface ListingWithAsset {
 }
 
 export function MarketplaceListings() {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const player = usePlayerProfile();
   const [listings, setListings] = useState<ListingWithAsset[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -71,12 +71,22 @@ export function MarketplaceListings() {
                 : listing.asset?.quality === "epic"
                   ? "epic"
                   : display.rarity;
+            const meta = display.meta;
+            const name = meta ? (language === "zh" ? meta.nameCn : meta.nameEn) : display.label;
+            const description = meta ? (language === "zh" ? meta.descriptionCn : meta.descriptionEn) : null;
             return (
               <div className={`loot-card loot-${rarity}`} key={listing.address}>
+                {meta ? (
+                  <div className="loot-card-image">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={meta.image} alt={name} loading="lazy" />
+                  </div>
+                ) : null}
                 <span className="field-label">
                   {rarity === "legendary" ? t.play.legendary : rarity === "epic" ? t.play.epic : t.play.rare}
                 </span>
-                <strong>{display.label}</strong>
+                <strong>{name}</strong>
+                {description ? <p className="loot-card-description">{description}</p> : null}
                 <p>
                   {t.marketplace.price}: {listing.priceEdcoins}
                 </p>

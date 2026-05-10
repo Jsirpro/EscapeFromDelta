@@ -492,13 +492,27 @@ export default function PlayPage() {
                           display: "flex",
                           justifyContent: "space-between",
                           alignItems: "center",
+                          gap: 10,
                         }}
                       >
-                        <div>
-                          <div style={{ fontSize: "9px", color: item.rarity === "legendary" ? "#f59e0b" : item.rarity === "epic" ? "#a855f7" : "#34d399", fontWeight: 900, textTransform: "uppercase", marginBottom: 2 }}>
-                            {item.rarity === "legendary" ? t.play.legendary : item.rarity === "epic" ? t.play.epic : t.play.rare}
+                        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                          {item.meta ? (
+                            <div style={{ flex: "0 0 40px", width: 40, height: 40, borderRadius: 6, overflow: "hidden", border: "1px solid rgba(255,255,255,0.08)", background: "#05080c" }}>
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={item.meta.image} alt={language === "zh" ? item.meta.nameCn : item.meta.nameEn} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                            </div>
+                          ) : null}
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize: "9px", color: item.rarity === "legendary" ? "#f59e0b" : item.rarity === "epic" ? "#a855f7" : "#34d399", fontWeight: 900, textTransform: "uppercase", marginBottom: 2 }}>
+                              {item.rarity === "legendary" ? t.play.legendary : item.rarity === "epic" ? t.play.epic : t.play.rare}
+                            </div>
+                            <div
+                              style={{ fontSize: "11px", color: "#e2e8f0", fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                              title={item.meta ? (language === "zh" ? item.meta.descriptionCn : item.meta.descriptionEn) : undefined}
+                            >
+                              {item.meta ? (language === "zh" ? item.meta.nameCn : item.meta.nameEn) : translateLootLabel(item.label, t)}
+                            </div>
                           </div>
-                          <div style={{ fontSize: "11px", color: "#e2e8f0", fontWeight: 700 }}>{translateLootLabel(item.label, t)}</div>
                         </div>
                         {player.onChainSafeCaseCapacity > 0 ? (
                           <button
@@ -1086,10 +1100,23 @@ export default function PlayPage() {
                           gap: 10,
                         }}
                       >
+                        {item.meta ? (
+                          <div style={{ width: "100%", aspectRatio: "1 / 1", borderRadius: 12, overflow: "hidden", border: "1px solid rgba(255,255,255,0.06)", background: "#05080c" }}>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img src={item.meta.image} alt={language === "zh" ? item.meta.nameCn : item.meta.nameEn} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+                          </div>
+                        ) : null}
                         <div style={{ fontSize: 11, color: item.rarity === "legendary" ? "#f59e0b" : item.rarity === "epic" ? "#a855f7" : "#34d399", fontWeight: 900, textTransform: "uppercase" }}>
                           {item.rarity === "legendary" ? t.play.legendary : item.rarity === "epic" ? t.play.epic : t.play.rare}
                         </div>
-                        <strong style={{ color: "#fff", fontSize: 15, lineHeight: 1.45 }}>{translateLootLabel(item.label, t)}</strong>
+                        <strong style={{ color: "#fff", fontSize: 15, lineHeight: 1.45 }}>
+                          {item.meta ? (language === "zh" ? item.meta.nameCn : item.meta.nameEn) : translateLootLabel(item.label, t)}
+                        </strong>
+                        {item.meta ? (
+                          <p style={{ margin: 0, color: "#94a3b8", fontSize: 12, lineHeight: 1.5 }}>
+                            {language === "zh" ? item.meta.descriptionCn : item.meta.descriptionEn}
+                          </p>
+                        ) : null}
                         {player.onChainSafeCaseCapacity > 0 ? (
                           <button
                             disabled={busyAction !== null || updatingSafeCase}
@@ -1240,10 +1267,17 @@ export default function PlayPage() {
               <div className="loot-grid">
                 {player.onChainLootItems.map((item) => (
                   <div className={`loot-card loot-${item.rarity}`} key={item.assetId}>
+                    {item.meta ? (
+                      <div className="loot-card-image">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={item.meta.image} alt={language === "zh" ? item.meta.nameCn : item.meta.nameEn} loading="lazy" />
+                      </div>
+                    ) : null}
                     <span className="field-label">
                       {item.rarity === "legendary" ? t.play.legendary : item.rarity === "epic" ? t.play.epic : t.play.rare}
                     </span>
-                    <strong>{translateLootLabel(item.label, t)}</strong>
+                    <strong>{item.meta ? (language === "zh" ? item.meta.nameCn : item.meta.nameEn) : translateLootLabel(item.label, t)}</strong>
+                    {item.meta ? <p className="loot-card-description">{language === "zh" ? item.meta.descriptionCn : item.meta.descriptionEn}</p> : null}
                     {player.onChainSafeCaseCapacity > 0 ? (
                       <button
                         className={player.onChainSafeCaseItems.includes(item.assetId) ? "button" : "button button-secondary"}

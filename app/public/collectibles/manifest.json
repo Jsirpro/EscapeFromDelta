@@ -1,0 +1,282 @@
+[
+  {
+    "tier": "legendary",
+    "index": 1,
+    "name_cn": "私钥破解器",
+    "name_en": "Private Key Cracker",
+    "slug": "private-key-cracker",
+    "file": "legendary/01_private-key-cracker.png"
+  },
+  {
+    "tier": "legendary",
+    "index": 2,
+    "name_cn": "非洲之心",
+    "name_en": "Heart of Africa",
+    "slug": "heart-of-africa",
+    "file": "legendary/02_heart-of-africa.png"
+  },
+  {
+    "tier": "legendary",
+    "index": 3,
+    "name_cn": "一折 BTC 购买权",
+    "name_en": "90% Off BTC Coupon",
+    "slug": "90-off-btc-coupon",
+    "file": "legendary/03_90-off-btc-coupon.png"
+  },
+  {
+    "tier": "legendary",
+    "index": 4,
+    "name_cn": "9090 显卡",
+    "name_en": "RTX 9090 GPU",
+    "slug": "rtx-9090-gpu",
+    "file": "legendary/04_rtx-9090-gpu.png"
+  },
+  {
+    "tier": "legendary",
+    "index": 5,
+    "name_cn": "七天庄家体验卡",
+    "name_en": "7-Day Market Maker Card",
+    "slug": "7day-market-maker-card",
+    "file": "legendary/05_7day-market-maker-card.png"
+  },
+  {
+    "tier": "epic",
+    "index": 1,
+    "name_cn": "黄金抄底手",
+    "name_en": "Golden Bottom-Catching Hand",
+    "slug": "golden-bottom-hand",
+    "file": "epic/01_golden-bottom-hand.png"
+  },
+  {
+    "tier": "epic",
+    "index": 2,
+    "name_cn": "内存条",
+    "name_en": "RAM Stick",
+    "slug": "ram-stick",
+    "file": "epic/02_ram-stick.png"
+  },
+  {
+    "tier": "epic",
+    "index": 3,
+    "name_cn": "硬盘",
+    "name_en": "Mysterious Hard Drive",
+    "slug": "hard-drive",
+    "file": "epic/03_hard-drive.png"
+  },
+  {
+    "tier": "epic",
+    "index": 4,
+    "name_cn": "Meme 币图腾",
+    "name_en": "Meme Coin Totem",
+    "slug": "meme-coin-totem",
+    "file": "epic/04_meme-coin-totem.png"
+  },
+  {
+    "tier": "epic",
+    "index": 5,
+    "name_cn": "劳力士手表",
+    "name_en": "Rolex Watch",
+    "slug": "rolex-watch",
+    "file": "epic/05_rolex-watch.png"
+  },
+  {
+    "tier": "epic",
+    "index": 6,
+    "name_cn": "交易所自定义按钮",
+    "name_en": "Custom Exchange Button",
+    "slug": "custom-exchange-button",
+    "file": "epic/06_custom-exchange-button.png"
+  },
+  {
+    "tier": "epic",
+    "index": 7,
+    "name_cn": "FOMO 之眼",
+    "name_en": "Eye of FOMO",
+    "slug": "eye-of-fomo",
+    "file": "epic/07_eye-of-fomo.png"
+  },
+  {
+    "tier": "epic",
+    "index": 8,
+    "name_cn": "牛熊转换罗盘",
+    "name_en": "Bull-Bear Compass",
+    "slug": "bull-bear-compass",
+    "file": "epic/08_bull-bear-compass.png"
+  },
+  {
+    "tier": "epic",
+    "index": 9,
+    "name_cn": "空投信标",
+    "name_en": "Airdrop Beacon",
+    "slug": "airdrop-beacon",
+    "file": "epic/09_airdrop-beacon.png"
+  },
+  {
+    "tier": "epic",
+    "index": 10,
+    "name_cn": "暴跌预言机",
+    "name_en": "Crash Oracle",
+    "slug": "crash-oracle",
+    "file": "epic/10_crash-oracle.png"
+  },
+  {
+    "tier": "rare",
+    "index": 1,
+    "name_cn": "破损背包扣",
+    "name_en": "Broken Backpack Clip",
+    "slug": "broken-backpack-clip",
+    "file": "rare/01_broken-backpack-clip.png"
+  },
+  {
+    "tier": "rare",
+    "index": 2,
+    "name_cn": "神秘二维码",
+    "name_en": "Mysterious QR Code",
+    "slug": "mysterious-qr-code",
+    "file": "rare/02_mysterious-qr-code.png"
+  },
+  {
+    "tier": "rare",
+    "index": 3,
+    "name_cn": "半张纸条",
+    "name_en": "Half a Note",
+    "slug": "half-note",
+    "file": "rare/03_half-note.png"
+  },
+  {
+    "tier": "rare",
+    "index": 4,
+    "name_cn": "摄像头",
+    "name_en": "Webcam",
+    "slug": "webcam",
+    "file": "rare/04_webcam.png"
+  },
+  {
+    "tier": "rare",
+    "index": 5,
+    "name_cn": "蓝色内裤(战损版)",
+    "name_en": "Battle-Damaged Blue Underwear",
+    "slug": "battle-damaged-underwear",
+    "file": "rare/05_battle-damaged-underwear.png"
+  },
+  {
+    "tier": "rare",
+    "index": 6,
+    "name_cn": "加密 U 盘",
+    "name_en": "Encrypted USB Drive",
+    "slug": "encrypted-usb",
+    "file": "rare/06_encrypted-usb.png"
+  },
+  {
+    "tier": "rare",
+    "index": 7,
+    "name_cn": "法拉利钥匙",
+    "name_en": "Ferrari Key",
+    "slug": "ferrari-key",
+    "file": "rare/07_ferrari-key.png"
+  },
+  {
+    "tier": "rare",
+    "index": 8,
+    "name_cn": "最后 10U",
+    "name_en": "Last 10 USDT",
+    "slug": "last-10-usdt",
+    "file": "rare/08_last-10-usdt.png"
+  },
+  {
+    "tier": "rare",
+    "index": 9,
+    "name_cn": "交易签名笔",
+    "name_en": "Trading Signature Pen",
+    "slug": "signature-pen",
+    "file": "rare/09_signature-pen.png"
+  },
+  {
+    "tier": "rare",
+    "index": 10,
+    "name_cn": "老鼠仓按钮",
+    "name_en": "Insider Trading Button",
+    "slug": "insider-button",
+    "file": "rare/10_insider-button.png"
+  },
+  {
+    "tier": "rare",
+    "index": 11,
+    "name_cn": "梭哈按钮(已损坏)",
+    "name_en": "Broken All-In Button",
+    "slug": "broken-allin-button",
+    "file": "rare/11_broken-allin-button.png"
+  },
+  {
+    "tier": "rare",
+    "index": 12,
+    "name_cn": "套牢证明书",
+    "name_en": "Bagholder Certificate",
+    "slug": "bagholder-certificate",
+    "file": "rare/12_bagholder-certificate.png"
+  },
+  {
+    "tier": "rare",
+    "index": 13,
+    "name_cn": "泡着枸杞的保温杯",
+    "name_en": "Wolfberry Thermos",
+    "slug": "wolfberry-thermos",
+    "file": "rare/13_wolfberry-thermos.png"
+  },
+  {
+    "tier": "rare",
+    "index": 14,
+    "name_cn": "加密磁带",
+    "name_en": "Encrypted Cassette Tape",
+    "slug": "encrypted-cassette",
+    "file": "rare/14_encrypted-cassette.png"
+  },
+  {
+    "tier": "rare",
+    "index": 15,
+    "name_cn": "钱包备份卡",
+    "name_en": "Wallet Backup Card",
+    "slug": "wallet-backup-card",
+    "file": "rare/15_wallet-backup-card.png"
+  },
+  {
+    "tier": "rare",
+    "index": 16,
+    "name_cn": "韭菜种子",
+    "name_en": "Leek Seeds",
+    "slug": "leek-seeds",
+    "file": "rare/16_leek-seeds.png"
+  },
+  {
+    "tier": "rare",
+    "index": 17,
+    "name_cn": "拉盘号角",
+    "name_en": "Pumping Horn",
+    "slug": "pumping-horn",
+    "file": "rare/17_pumping-horn.png"
+  },
+  {
+    "tier": "rare",
+    "index": 18,
+    "name_cn": "实体比特币",
+    "name_en": "Physical Bitcoin (Chocolate)",
+    "slug": "physical-bitcoin-chocolate",
+    "file": "rare/18_physical-bitcoin-chocolate.png"
+  },
+  {
+    "tier": "rare",
+    "index": 19,
+    "name_cn": "鼠标",
+    "name_en": "Fate Mouse",
+    "slug": "fate-mouse",
+    "file": "rare/19_fate-mouse.png"
+  },
+  {
+    "tier": "rare",
+    "index": 20,
+    "name_cn": "'新鲜'的汉堡",
+    "name_en": "'Fresh' Hamburger",
+    "slug": "fresh-hamburger",
+    "file": "rare/20_fresh-hamburger.png"
+  }
+]

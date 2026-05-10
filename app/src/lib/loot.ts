@@ -1,5 +1,7 @@
 "use client";
 
+import { getCollectibleByCode, getCollectibleByRaritySerial, type CollectibleMeta } from "./collectibles";
+
 const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 const BASE58_INDEXES = new Map(BASE58_ALPHABET.split("").map((char, index) => [char, index]));
 
@@ -7,6 +9,7 @@ export interface LootDisplayItem {
   assetId: string;
   rarity: "rare" | "epic" | "legendary";
   label: string;
+  meta?: CollectibleMeta;
 }
 
 export function deriveCollectibleDisplayFromCode(code: string, assetId: string): LootDisplayItem {
@@ -18,10 +21,12 @@ export function deriveCollectibleDisplayFromCode(code: string, assetId: string):
   const serial = Number.parseInt(match[2], 10);
   const labelPrefix =
     rarity === "legendary" ? "Legendary Collectible" : rarity === "epic" ? "Epic Collectible" : "Rare Collectible";
+  const meta = getCollectibleByCode(code) ?? getCollectibleByRaritySerial(rarity, serial);
   return {
     assetId,
     rarity,
     label: `${labelPrefix} ${serial}`,
+    meta,
   };
 }
 
@@ -38,6 +43,7 @@ export function deriveCollectibleDisplay(assetId: string): LootDisplayItem {
     assetId,
     rarity,
     label: `${labelPrefix} ${serial}`,
+    meta: getCollectibleByRaritySerial(rarity, serial),
   };
 }
 

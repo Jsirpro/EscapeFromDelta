@@ -6,9 +6,9 @@ import { Connection, PublicKey, Transaction, type SendOptions } from "@solana/we
 import bs58 from "bs58";
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from "react";
 import idl from "../../../target/idl/escape_from_delta.json";
-import { decodeBattleRecord } from "../../../clients/src/queries/battleRecords";
-import { decodePlayerProfile } from "../../../clients/src/queries/player";
-import type { BattleRecord, PlayerProfile } from "../../../clients/src/types";
+import { decodeBattleRecord } from "@escape-from-delta/clients/src/queries/battleRecords";
+import { decodePlayerProfile } from "@escape-from-delta/clients/src/queries/player";
+import type { BattleRecord, PlayerProfile } from "@escape-from-delta/clients/src/types";
 
 const PROGRAM_ID =
   process.env.NEXT_PUBLIC_PROGRAM_ID ?? process.env.PROGRAM_ID ?? "7ueVgYfrwidjpwMCBfGyHCoVpaVNe7Ep1h2Mxv1ENBYQ";
@@ -936,19 +936,26 @@ async function waitForSignatureStatus(
   signature: string,
   lastValidBlockHeight?: number,
 ) {
-  const deadline = Date.now() + 15_000;
+  const deadline = Date.now() + 45_000;
   while (Date.now() < deadline) {
-    const status = (await withTimeout(connection.getSignatureStatuses([signature]), "signature-status-timeout")).value[0];
-    if (status?.err) {
-      throw new Error(`transaction-failed:${JSON.stringify(status.err)}`);
-    }
-    if (status?.confirmationStatus === "confirmed" || status?.confirmationStatus === "finalized") {
-      return;
-    }
-    if (lastValidBlockHeight !== undefined) {
-      const currentBlockHeight = await withTimeout(connection.getBlockHeight("confirmed"), "block-height-timeout");
-      if (currentBlockHeight > lastValidBlockHeight) {
-        throw new Error("transaction-blockhash-expired");
+    try {
+      const status = (await withTimeout(connection.getSignatureStatuses([signature]), "signature-status-timeout", 8_000))
+        .value[0];
+      if (status?.err) {
+        throw new Error(`transaction-failed:${JSON.stringify(status.err)}`);
+      }
+      if (status?.confirmationStatus === "confirmed" || status?.confirmationStatus === "finalized") {
+        return;
+      }
+      if (lastValidBlockHeight !== undefined) {
+        const currentBlockHeight = await withTimeout(connection.getBlockHeight("confirmed"), "block-height-timeout", 8_000);
+        if (currentBlockHeight > lastValidBlockHeight) {
+          throw new Error("transaction-blockhash-expired");
+        }
+      }
+    } catch (error) {
+      if (!isTransientRpcConfirmationError(error)) {
+        throw error;
       }
     }
     await sleep(400);
@@ -976,6 +983,18 @@ function isAlreadyProcessedError(error: unknown) {
 
 function isFetchTransportError(error: unknown) {
   return error instanceof TypeError && error.message.includes("Failed to fetch");
+}
+
+function isTransientRpcConfirmationError(error: unknown) {
+  if (!(error instanceof Error)) return false;
+  const message = error.message.toLowerCase();
+  return (
+    message.includes("signature-status-timeout") ||
+    message.includes("block-height-timeout") ||
+    message.includes("failed to fetch") ||
+    message.includes("fetchfailed") ||
+    message.includes("network request failed")
+  );
 }
 
 function isInvalidSessionTokenError(error: unknown) {
