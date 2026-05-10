@@ -96,7 +96,8 @@ export async function ensureLocalDemoSetup(options: { includeServerPlayer?: bool
     difficultyConfiguration = anchor.web3.PublicKey.default;
   }
 
-  return { provider, program, wallet, gameConfig, adminProfile, playerProfile, difficultyConfiguration };
+  const solTreasury = new anchor.web3.PublicKey(gameConfigAccount.solTreasury);
+  return { provider, program, wallet, gameConfig, adminProfile, playerProfile, difficultyConfiguration, solTreasury };
 }
 
 export async function startLocalDemoRaid() {
@@ -242,7 +243,7 @@ export async function buildCancelListingTransaction(player: string, listingAddre
 }
 
 export async function buildConvertSolToEdcoinsTransaction(player: string, solLamports = LAMPORTS_PER_SOL) {
-  const { provider, program, gameConfig, wallet } = await ensureLocalDemoSetup();
+  const { provider, program, gameConfig, solTreasury } = await ensureLocalDemoSetup();
   const playerKey = new anchor.web3.PublicKey(player);
   const playerProfile = derivePlayerProfile(playerKey);
   const transaction = await program.methods
@@ -251,7 +252,7 @@ export async function buildConvertSolToEdcoinsTransaction(player: string, solLam
       gameConfig,
       playerProfile,
       player: playerKey,
-      solTreasury: wallet,
+      solTreasury,
       systemProgram: anchor.web3.SystemProgram.programId,
     })
     .transaction();

@@ -1101,7 +1101,7 @@ export default function PlayPage() {
                         }}
                       >
                         {item.meta ? (
-                          <div style={{ width: "100%", aspectRatio: "1 / 1", borderRadius: 12, overflow: "hidden", border: "1px solid rgba(255,255,255,0.06)", background: "#05080c" }}>
+                          <div style={{ width: "100%", maxWidth: 140, aspectRatio: "1 / 1", borderRadius: 12, overflow: "hidden", border: "1px solid rgba(255,255,255,0.06)", background: "#05080c" }}>
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={item.meta.image} alt={language === "zh" ? item.meta.nameCn : item.meta.nameEn} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
                           </div>

@@ -470,10 +470,13 @@ function Panel({
 }
 
 function BalanceCard({ label, value, accent = false }: { label: string; value: string; accent?: boolean }) {
+  const digitCount = value.replace(/[^0-9]/g, "").length;
+  const fontSize = digitCount > 9 ? 30 : digitCount > 7 ? 38 : digitCount > 5 ? 46 : 54;
   return (
     <div
       style={{
         minHeight: 150,
+        padding: "18px 16px",
         borderRadius: 24,
         border: accent ? "1px solid rgba(16,185,129,0.28)" : "1px solid rgba(255,255,255,0.08)",
         background: "rgba(0,0,0,0.24)",
@@ -482,10 +485,24 @@ function BalanceCard({ label, value, accent = false }: { label: string; value: s
         justifyContent: "center",
         alignItems: "center",
         gap: 10,
+        overflow: "hidden",
       }}
     >
-      <span style={{ color: accent ? "#10b981" : "#64748b", fontSize: 15, fontWeight: 900, letterSpacing: "0.18em" }}>{label}</span>
-      <strong style={{ color: accent ? "#34d399" : "#fff", fontSize: 54, lineHeight: 1, fontWeight: 900 }}>{value}</strong>
+      <span style={{ color: accent ? "#10b981" : "#64748b", fontSize: 15, fontWeight: 900, letterSpacing: "0.18em", textAlign: "center" }}>{label}</span>
+      <strong
+        style={{
+          color: accent ? "#34d399" : "#fff",
+          fontSize,
+          lineHeight: 1,
+          fontWeight: 900,
+          maxWidth: "100%",
+          textAlign: "center",
+          wordBreak: "break-all",
+          overflowWrap: "anywhere",
+        }}
+      >
+        {value}
+      </strong>
     </div>
   );
 }

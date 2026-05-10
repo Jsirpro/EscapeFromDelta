@@ -1,8 +1,10 @@
 "use client";
 
-import { createContext, type ReactNode, useContext, useMemo, useState } from "react";
+import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from "react";
 
 export type Language = "en" | "zh";
+
+const LANGUAGE_STORAGE_KEY = "efd.language";
 
 export const copy = {
   en: {
@@ -191,6 +193,15 @@ export const copy = {
       seller: "Seller",
       buy: "Buy",
       cancel: "Cancel Listing",
+      loading: "Loading listings…",
+      loadFailed: "Failed to load listings. The RPC endpoint is rate limited or unavailable.",
+      retry: "Retry",
+      newListing: "New Listing",
+      activeListings: "Active Listings",
+      selectAsset: "Select asset",
+      noTradableAsset: "No tradable collectible in your warehouse.",
+      feePreview: "Platform fee: {fee} EDcoins",
+      listingsCount: "{count} on sale",
     },
     admin: {
       eyebrow: "Operator tools",
@@ -377,7 +388,7 @@ export const copy = {
     },
     marketplace: {
       eyebrow: "交易",
-      title: "交易",
+      title: "交易市场",
       price: "价格",
       fee: "手续费：上架前收取价格的 3%，向上取整。",
       createListing: "创建上架",
@@ -386,6 +397,15 @@ export const copy = {
       seller: "卖家",
       buy: "购买",
       cancel: "下架",
+      loading: "正在加载上架列表…",
+      loadFailed: "读取上架列表失败。RPC 节点被限流或暂时不可用。",
+      retry: "重试",
+      newListing: "创建新上架",
+      activeListings: "在售列表",
+      selectAsset: "选择资产",
+      noTradableAsset: "仓库中暂无可交易的收藏品。",
+      feePreview: "平台手续费：{fee} EDcoins",
+      listingsCount: "共 {count} 件在售",
     },
     admin: {
       eyebrow: "管理员工具",
@@ -409,11 +429,35 @@ const LanguageContext = createContext<LanguageState | null>(null);
 
 export function LanguageProvider({ children }: { children: ReactNode }) {
   const [language, setLanguage] = useState<Language>("en");
+
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
+      if (stored === "en" || stored === "zh") {
+        setLanguage(stored);
+        return;
+      }
+      const preferred = window.navigator.language?.toLowerCase().startsWith("zh") ? "zh" : "en";
+      setLanguage(preferred);
+    } catch {
+      /* ignore storage/navigator access errors */
+    }
+  }, []);
+
   const value = useMemo(
     () => ({
       language,
       t: copy[language],
-      toggleLanguage: () => setLanguage((current) => (current === "en" ? "zh" : "en")),
+      toggleLanguage: () =>
+        setLanguage((current) => {
+          const next = current === "en" ? "zh" : "en";
+          try {
+            window.localStorage.setItem(LANGUAGE_STORAGE_KEY, next);
+          } catch {
+            /* ignore storage errors */
+          }
+          return next;
+        }),
     }),
     [language],
   );

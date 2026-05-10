@@ -363,15 +363,27 @@ async function getAccountInfo(
 }
 
 async function withRpcRetry<T>(operation: () => Promise<T>, attempt = 0): Promise<T> {
+  const maxAttempts = 5;
   try {
     return await operation();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    const shouldRetry = attempt < 2 && (message === "rpc-http-429" || message.includes("429"));
-    if (!shouldRetry) {
+    const lower = message.toLowerCase();
+    const isTransient =
+      message === "rpc-http-429" ||
+      lower.includes("429") ||
+      /rpc-http-5\d\d/.test(message) ||
+      lower.includes("fetch failed") ||
+      lower.includes("failed to fetch") ||
+      lower.includes("network request failed") ||
+      lower.includes("econnreset") ||
+      lower.includes("etimedout");
+    if (!isTransient || attempt >= maxAttempts - 1) {
       throw error;
     }
-    await sleep(300 * (attempt + 1));
+    const backoff = 400 * Math.pow(2, attempt);
+    const jitter = Math.floor(Math.random() * 200);
+    await sleep(backoff + jitter);
     return withRpcRetry(operation, attempt + 1);
   }
 }
