@@ -12,6 +12,9 @@ type ProgramAccountNamespace = {
   gameConfig: {
     fetch(address: anchor.web3.PublicKey): Promise<any>;
   };
+  marketplaceListing: {
+    fetch(address: anchor.web3.PublicKey): Promise<any>;
+  };
   playerProfile: {
     fetch(address: anchor.web3.PublicKey): Promise<any>;
     fetchNullable(address: anchor.web3.PublicKey): Promise<any | null>;

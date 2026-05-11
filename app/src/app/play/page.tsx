@@ -1804,6 +1804,7 @@ function PurchaseInputBlock({
   insufficient,
   insufficientLabel,
   purchaseHint,
+  buyLabel,
   disabled,
   onChange,
   onBuy,
@@ -1815,6 +1816,7 @@ function PurchaseInputBlock({
   insufficient: boolean;
   insufficientLabel: string;
   purchaseHint: string;
+  buyLabel: string;
   disabled: boolean;
   onChange: (value: string) => void;
   onBuy: () => void;
@@ -1870,7 +1872,7 @@ function PurchaseInputBlock({
             transition: "all 0.2s",
           }}
         >
-          BUY
+          {buyLabel}
         </button>
       </div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>

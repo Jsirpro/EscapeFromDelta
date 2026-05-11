@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "overrides": {
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
+  },
   "workspaces": [
     "app",
     "clients"
@@ -29,6 +33,8 @@
     "vitest": "^2.0.0"
   },
   "dependencies": {
-    "@coral-xyz/anchor": "^0.32.1"
+    "@coral-xyz/anchor": "^0.32.1",
+    "react": "18.3.1",
+    "react-dom": "18.3.1"
   }
 }

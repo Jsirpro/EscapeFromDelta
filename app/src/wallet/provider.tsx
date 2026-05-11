@@ -773,12 +773,12 @@ async function buildDirectSettlementTransaction(
     { ...(idl as anchor.Idl), address: PROGRAM_ID } as anchor.Idl,
     provider,
   );
-  const playerAccount = (await program.account.playerProfile.fetch(playerProfile)) as {
-    warehouseNonce: anchor.BN;
+  const accountNamespace = program.account as unknown as {
+    playerProfile: { fetch(address: PublicKey): Promise<{ warehouseNonce: anchor.BN }> };
+    raidSession: { fetch(address: PublicKey): Promise<{ safeCaseSelection: PublicKey[] }> };
   };
-  const raidAccountDecoded = (await program.account.raidSession.fetch(raidSession)) as {
-    safeCaseSelection: PublicKey[];
-  };
+  const playerAccount = await accountNamespace.playerProfile.fetch(playerProfile);
+  const raidAccountDecoded = await accountNamespace.raidSession.fetch(raidSession);
   const warehouseAssetAccounts = deriveWarehouseAssetAccounts(
     playerProfile,
     BigInt(playerAccount.warehouseNonce.toString()),
