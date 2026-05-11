@@ -1,4 +1,9 @@
 target/
+!target/
+target/*
+!target/idl/
+target/idl/*
+!target/idl/*.json
 debug/
 release/
 node_modules/

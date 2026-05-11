@@ -1,0 +1,2595 @@
+{
+  "address": "E3Axdx3hzXcZEmo7u4xLYXRtCQcUDtoRtioNwRmDPaKa",
+  "metadata": {
+    "name": "escape_from_delta",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Escape from Delta on-chain raid game"
+  },
+  "instructions": [
+    {
+      "name": "cancel_listing",
+      "discriminator": [
+        41,
+        183,
+        50,
+        232,
+        230,
+        233,
+        157,
+        70
+      ],
+      "accounts": [
+        {
+          "name": "seller",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "seller_profile",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  108,
+                  97,
+                  121,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "seller"
+              }
+            ]
+          }
+        },
+        {
+          "name": "warehouse_asset",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  115,
+                  115,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "seller_profile"
+              },
+              {
+                "kind": "account",
+                "path": "warehouse_asset.asset_id",
+                "account": "WarehouseAsset"
+              }
+            ]
+          }
+        },
+        {
+          "name": "marketplace_listing",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  105,
+                  115,
+                  116,
+                  105,
+                  110,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "warehouse_asset"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "convert_sol_to_edcoins",
+      "discriminator": [
+        245,
+        196,
+        158,
+        244,
+        155,
+        167,
+        162,
+        252
+      ],
+      "accounts": [
+        {
+          "name": "game_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  97,
+                  109,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "player_profile",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  108,
+                  97,
+                  121,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player"
+              }
+            ]
+          }
+        },
+        {
+          "name": "player",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "sol_treasury",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "sol_amount",
+          "type": "u64"
+        }
+      ],
+      "returns": "u64"
+    },
+    {
+      "name": "create_difficulty_version",
+      "discriminator": [
+        20,
+        77,
+        193,
+        56,
+        3,
+        116,
+        238,
+        162
+      ],
+      "accounts": [
+        {
+          "name": "game_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  97,
+                  109,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin_profile",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  100,
+                  109,
+                  105,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "admin"
+              }
+            ]
+          }
+        },
+        {
+          "name": "difficulty_configuration",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  105,
+                  102,
+                  102,
+                  105,
+                  99,
+                  117,
+                  108,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "admin"
+              },
+              {
+                "kind": "arg",
+                "path": "entry_fee"
+              },
+              {
+                "kind": "arg",
+                "path": "low"
+              },
+              {
+                "kind": "arg",
+                "path": "medium"
+              },
+              {
+                "kind": "arg",
+                "path": "high"
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "entry_fee",
+          "type": "u64"
+        },
+        {
+          "name": "low",
+          "type": "u16"
+        },
+        {
+          "name": "medium",
+          "type": "u16"
+        },
+        {
+          "name": "high",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "create_listing",
+      "discriminator": [
+        18,
+        168,
+        45,
+        24,
+        191,
+        31,
+        117,
+        54
+      ],
+      "accounts": [
+        {
+          "name": "seller",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "seller_profile",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  108,
+                  97,
+                  121,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "seller"
+              }
+            ]
+          }
+        },
+        {
+          "name": "warehouse_asset",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  115,
+                  115,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "seller_profile"
+              },
+              {
+                "kind": "account",
+                "path": "warehouse_asset.asset_id",
+                "account": "WarehouseAsset"
+              }
+            ]
+          }
+        },
+        {
+          "name": "marketplace_listing",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  105,
+                  115,
+                  116,
+                  105,
+                  110,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "warehouse_asset"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "price_edcoins",
+          "type": "u64"
+        }
+      ],
+      "returns": "u64"
+    },
+    {
+      "name": "create_or_connect_player",
+      "discriminator": [
+        149,
+        114,
+        207,
+        30,
+        133,
+        49,
+        98,
+        101
+      ],
+      "accounts": [
+        {
+          "name": "game_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  97,
+                  109,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "player_profile",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  108,
+                  97,
+                  121,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player"
+              }
+            ]
+          }
+        },
+        {
+          "name": "player",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "extract_raid",
+      "discriminator": [
+        222,
+        223,
+        183,
+        42,
+        151,
+        60,
+        183,
+        158
+      ],
+      "accounts": [
+        {
+          "name": "player",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_profile",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  108,
+                  97,
+                  121,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player"
+              }
+            ]
+          }
+        },
+        {
+          "name": "raid_session",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  97,
+                  105,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_profile"
+              },
+              {
+                "kind": "account",
+                "path": "raid_session.raid_id",
+                "account": "RaidSession"
+              }
+            ]
+          }
+        },
+        {
+          "name": "battle_record",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  97,
+                  116,
+                  116,
+                  108,
+                  101,
+                  95,
+                  114,
+                  101,
+                  99,
+                  111,
+                  114,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_profile"
+              },
+              {
+                "kind": "account",
+                "path": "raid_session.raid_id",
+                "account": "RaidSession"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "fight_enemy",
+      "discriminator": [
+        172,
+        188,
+        46,
+        212,
+        182,
+        214,
+        18,
+        49
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_profile",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  108,
+                  97,
+                  121,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_profile.wallet",
+                "account": "PlayerProfile"
+              }
+            ]
+          }
+        },
+        {
+          "name": "raid_session",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  97,
+                  105,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_profile"
+              },
+              {
+                "kind": "account",
+                "path": "raid_session.raid_id",
+                "account": "RaidSession"
+              }
+            ]
+          }
+        },
+        {
+          "name": "session_token",
+          "optional": true
+        }
+      ],
+      "args": [
+        {
+          "name": "armor",
+          "type": "u16"
+        },
+        {
+          "name": "weapon",
+          "type": "u16"
+        },
+        {
+          "name": "enemy",
+          "type": "u16"
+        },
+        {
+          "name": "final_random_value",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "initialize_admin_profile",
+      "discriminator": [
+        243,
+        84,
+        205,
+        8,
+        25,
+        5,
+        176,
+        116
+      ],
+      "accounts": [
+        {
+          "name": "game_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  97,
+                  109,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "admin_profile",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  100,
+                  109,
+                  105,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "deployer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "deployer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "initialize_game",
+      "discriminator": [
+        44,
+        62,
+        102,
+        247,
+        126,
+        208,
+        130,
+        215
+      ],
+      "accounts": [
+        {
+          "name": "game_config",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  97,
+                  109,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "deployer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "edcoins_mint",
+          "type": "pubkey"
+        },
+        {
+          "name": "token_program",
+          "type": "pubkey"
+        },
+        {
+          "name": "treasury_edcoins_account",
+          "type": "pubkey"
+        },
+        {
+          "name": "sol_treasury",
+          "type": "pubkey"
+        }
+      ]
+    },
+    {
+      "name": "move_area",
+      "discriminator": [
+        148,
+        137,
+        10,
+        9,
+        195,
+        75,
+        235,
+        100
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_profile",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  108,
+                  97,
+                  121,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_profile.wallet",
+                "account": "PlayerProfile"
+              }
+            ]
+          }
+        },
+        {
+          "name": "raid_session",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  97,
+                  105,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_profile"
+              },
+              {
+                "kind": "account",
+                "path": "raid_session.raid_id",
+                "account": "RaidSession"
+              }
+            ]
+          }
+        },
+        {
+          "name": "session_token",
+          "optional": true
+        }
+      ],
+      "args": [
+        {
+          "name": "target_area",
+          "type": {
+            "defined": {
+              "name": "RiskLevel"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "open_container",
+      "discriminator": [
+        152,
+        230,
+        21,
+        199,
+        80,
+        190,
+        171,
+        97
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_profile",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  108,
+                  97,
+                  121,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_profile.wallet",
+                "account": "PlayerProfile"
+              }
+            ]
+          }
+        },
+        {
+          "name": "raid_session",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  97,
+                  105,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_profile"
+              },
+              {
+                "kind": "account",
+                "path": "raid_session.raid_id",
+                "account": "RaidSession"
+              }
+            ]
+          }
+        },
+        {
+          "name": "session_token",
+          "optional": true
+        }
+      ],
+      "args": [
+        {
+          "name": "container_index",
+          "type": "u8"
+        },
+        {
+          "name": "base",
+          "type": "u16"
+        },
+        {
+          "name": "same_area_steps",
+          "type": "u16"
+        },
+        {
+          "name": "area_changes",
+          "type": "u16"
+        },
+        {
+          "name": "final_random_value",
+          "type": "u64"
+        }
+      ],
+      "returns": "u16"
+    },
+    {
+      "name": "purchase_listing",
+      "discriminator": [
+        246,
+        29,
+        226,
+        161,
+        105,
+        118,
+        198,
+        150
+      ],
+      "accounts": [
+        {
+          "name": "buyer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "buyer_profile",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  108,
+                  97,
+                  121,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "buyer"
+              }
+            ]
+          }
+        },
+        {
+          "name": "seller_profile",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  108,
+                  97,
+                  121,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "seller_profile.wallet",
+                "account": "PlayerProfile"
+              }
+            ]
+          }
+        },
+        {
+          "name": "warehouse_asset",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  115,
+                  115,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "seller_profile"
+              },
+              {
+                "kind": "account",
+                "path": "warehouse_asset.asset_id",
+                "account": "WarehouseAsset"
+              }
+            ]
+          }
+        },
+        {
+          "name": "marketplace_listing",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  108,
+                  105,
+                  115,
+                  116,
+                  105,
+                  110,
+                  103
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "warehouse_asset"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "purchase_loadout_points",
+      "discriminator": [
+        53,
+        165,
+        121,
+        119,
+        67,
+        212,
+        134,
+        50
+      ],
+      "accounts": [
+        {
+          "name": "game_config",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  103,
+                  97,
+                  109,
+                  101,
+                  95,
+                  99,
+                  111,
+                  110,
+                  102,
+                  105,
+                  103
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "name": "player_profile",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  108,
+                  97,
+                  121,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player"
+              }
+            ]
+          }
+        },
+        {
+          "name": "player",
+          "writable": true,
+          "signer": true
+        }
+      ],
+      "args": [
+        {
+          "name": "kind",
+          "type": {
+            "defined": {
+              "name": "LoadoutPointKind"
+            }
+          }
+        },
+        {
+          "name": "amount_tenths",
+          "type": "u16"
+        }
+      ]
+    },
+    {
+      "name": "select_safe_case_items",
+      "discriminator": [
+        138,
+        91,
+        19,
+        159,
+        76,
+        126,
+        217,
+        199
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_profile",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  108,
+                  97,
+                  121,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_profile.wallet",
+                "account": "PlayerProfile"
+              }
+            ]
+          }
+        },
+        {
+          "name": "raid_session",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  97,
+                  105,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_profile"
+              },
+              {
+                "kind": "account",
+                "path": "raid_session.raid_id",
+                "account": "RaidSession"
+              }
+            ]
+          }
+        },
+        {
+          "name": "session_token",
+          "optional": true
+        }
+      ],
+      "args": [
+        {
+          "name": "selected_assets",
+          "type": {
+            "vec": "pubkey"
+          }
+        },
+        {
+          "name": "capacity",
+          "type": "u8"
+        }
+      ]
+    },
+    {
+      "name": "settle_failed_raid",
+      "discriminator": [
+        205,
+        0,
+        142,
+        223,
+        154,
+        168,
+        201,
+        219
+      ],
+      "accounts": [
+        {
+          "name": "player",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_profile",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  108,
+                  97,
+                  121,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player"
+              }
+            ]
+          }
+        },
+        {
+          "name": "raid_session",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  97,
+                  105,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_profile"
+              },
+              {
+                "kind": "account",
+                "path": "raid_session.raid_id",
+                "account": "RaidSession"
+              }
+            ]
+          }
+        },
+        {
+          "name": "battle_record",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  97,
+                  116,
+                  116,
+                  108,
+                  101,
+                  95,
+                  114,
+                  101,
+                  99,
+                  111,
+                  114,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_profile"
+              },
+              {
+                "kind": "account",
+                "path": "raid_session.raid_id",
+                "account": "RaidSession"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "start_raid",
+      "discriminator": [
+        75,
+        15,
+        167,
+        23,
+        186,
+        132,
+        225,
+        50
+      ],
+      "accounts": [
+        {
+          "name": "player",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "player_profile",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  108,
+                  97,
+                  121,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player"
+              }
+            ]
+          }
+        },
+        {
+          "name": "raid_session",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  97,
+                  105,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "player_profile"
+              },
+              {
+                "kind": "account",
+                "path": "player_profile.next_raid_id",
+                "account": "PlayerProfile"
+              }
+            ]
+          }
+        },
+        {
+          "name": "difficulty_configuration",
+          "docs": [
+            "when configured, this must match a program-owned difficulty account."
+          ]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "armor_tenths",
+          "type": "u16"
+        },
+        {
+          "name": "weapon_tenths",
+          "type": "u16"
+        },
+        {
+          "name": "entry_fee",
+          "type": "u64"
+        },
+        {
+          "name": "safe_case_capacity",
+          "type": "u8"
+        }
+      ]
+    }
+  ],
+  "accounts": [
+    {
+      "name": "AdminProfile",
+      "discriminator": [
+        193,
+        215,
+        185,
+        255,
+        212,
+        215,
+        3,
+        27
+      ]
+    },
+    {
+      "name": "BattleRecord",
+      "discriminator": [
+        76,
+        224,
+        26,
+        215,
+        77,
+        210,
+        219,
+        137
+      ]
+    },
+    {
+      "name": "DifficultyConfiguration",
+      "discriminator": [
+        183,
+        250,
+        128,
+        213,
+        103,
+        93,
+        156,
+        45
+      ]
+    },
+    {
+      "name": "GameConfig",
+      "discriminator": [
+        45,
+        146,
+        146,
+        33,
+        170,
+        69,
+        96,
+        133
+      ]
+    },
+    {
+      "name": "MarketplaceListing",
+      "discriminator": [
+        211,
+        106,
+        229,
+        109,
+        73,
+        75,
+        97,
+        122
+      ]
+    },
+    {
+      "name": "PlayerProfile",
+      "discriminator": [
+        82,
+        226,
+        99,
+        87,
+        164,
+        130,
+        181,
+        80
+      ]
+    },
+    {
+      "name": "RaidSession",
+      "discriminator": [
+        25,
+        93,
+        59,
+        50,
+        67,
+        161,
+        133,
+        163
+      ]
+    },
+    {
+      "name": "SessionToken",
+      "discriminator": [
+        233,
+        4,
+        115,
+        14,
+        46,
+        21,
+        1,
+        15
+      ]
+    },
+    {
+      "name": "WarehouseAsset",
+      "discriminator": [
+        43,
+        21,
+        66,
+        187,
+        27,
+        133,
+        165,
+        100
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "Unauthorized",
+      "msg": "The acting wallet is not authorized for this account or action."
+    },
+    {
+      "code": 6001,
+      "name": "InvalidAccount",
+      "msg": "The account owner, mint, PDA seed, discriminator, or schema version is invalid."
+    },
+    {
+      "code": 6002,
+      "name": "InvalidNumericRange",
+      "msg": "The requested numeric value is outside the allowed game range."
+    },
+    {
+      "code": 6003,
+      "name": "ArithmeticOverflow",
+      "msg": "The checked arithmetic operation overflowed or underflowed."
+    },
+    {
+      "code": 6004,
+      "name": "InsufficientFunds",
+      "msg": "The player has insufficient EDcoins or SOL for this action."
+    },
+    {
+      "code": 6005,
+      "name": "StarterGrantAlreadyClaimed",
+      "msg": "The player already received the one-time starter grant."
+    },
+    {
+      "code": 6006,
+      "name": "RaidAlreadyActive",
+      "msg": "The player already has an active raid."
+    },
+    {
+      "code": 6007,
+      "name": "InvalidRaidState",
+      "msg": "The raid state does not allow this transition."
+    },
+    {
+      "code": 6008,
+      "name": "RaidTimedOut",
+      "msg": "The raid has timed out and must settle as failure."
+    },
+    {
+      "code": 6009,
+      "name": "InvalidEquipment",
+      "msg": "The selected equipment is invalid for this raid."
+    },
+    {
+      "code": 6010,
+      "name": "InvalidSafeCaseSelection",
+      "msg": "The selected safe-case item set is invalid."
+    },
+    {
+      "code": 6011,
+      "name": "InvalidContainer",
+      "msg": "The selected container is invalid or already opened."
+    },
+    {
+      "code": 6012,
+      "name": "InvalidListing",
+      "msg": "The marketplace listing is invalid for this action."
+    },
+    {
+      "code": 6013,
+      "name": "InvalidDifficultyConfig",
+      "msg": "The admin difficulty configuration is invalid."
+    },
+    {
+      "code": 6014,
+      "name": "InvalidRandomAudit",
+      "msg": "The random audit data is missing or malformed."
+    },
+    {
+      "code": 6015,
+      "name": "BattleRecordImmutable",
+      "msg": "Completed battle records are immutable."
+    }
+  ],
+  "types": [
+    {
+      "name": "AdminProfile",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "schema_version",
+            "type": "u16"
+          },
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "active",
+            "type": "bool"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AssetLockState",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Available"
+          },
+          {
+            "name": "InRaid"
+          },
+          {
+            "name": "Listed"
+          },
+          {
+            "name": "Consumed"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AssetQuality",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Common"
+          },
+          {
+            "name": "Uncommon"
+          },
+          {
+            "name": "Rare"
+          },
+          {
+            "name": "Epic"
+          },
+          {
+            "name": "Legendary"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AssetType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Collectible"
+          },
+          {
+            "name": "ArmorPoints"
+          },
+          {
+            "name": "WeaponPoints"
+          },
+          {
+            "name": "SafeCase"
+          }
+        ]
+      }
+    },
+    {
+      "name": "BattleRecord",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "schema_version",
+            "type": "u16"
+          },
+          {
+            "name": "record_id",
+            "type": "u64"
+          },
+          {
+            "name": "player_profile",
+            "type": "pubkey"
+          },
+          {
+            "name": "raid_id",
+            "type": "u64"
+          },
+          {
+            "name": "difficulty_id",
+            "type": "u64"
+          },
+          {
+            "name": "difficulty_version",
+            "type": "u32"
+          },
+          {
+            "name": "result",
+            "type": {
+              "defined": {
+                "name": "RaidResult"
+              }
+            }
+          },
+          {
+            "name": "retained_assets",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "lost_assets",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "entry_fee_paid",
+            "type": "u64"
+          },
+          {
+            "name": "started_at",
+            "type": "i64"
+          },
+          {
+            "name": "settled_at",
+            "type": "i64"
+          },
+          {
+            "name": "random_event_audits",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "RandomEventAudit"
+                }
+              }
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "DifficultyConfiguration",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "schema_version",
+            "type": "u16"
+          },
+          {
+            "name": "difficulty_id",
+            "type": "u64"
+          },
+          {
+            "name": "version",
+            "type": "u32"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "active",
+            "type": "bool"
+          },
+          {
+            "name": "entry_fee_edcoins",
+            "type": "u64"
+          },
+          {
+            "name": "low",
+            "type": {
+              "defined": {
+                "name": "RiskAreaConfig"
+              }
+            }
+          },
+          {
+            "name": "medium",
+            "type": {
+              "defined": {
+                "name": "RiskAreaConfig"
+              }
+            }
+          },
+          {
+            "name": "high",
+            "type": {
+              "defined": {
+                "name": "RiskAreaConfig"
+              }
+            }
+          },
+          {
+            "name": "created_by_admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "GameConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "schema_version",
+            "type": "u16"
+          },
+          {
+            "name": "admin_authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "edcoins_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "token_program",
+            "type": "pubkey"
+          },
+          {
+            "name": "treasury_edcoins_account",
+            "type": "pubkey"
+          },
+          {
+            "name": "sol_treasury",
+            "type": "pubkey"
+          },
+          {
+            "name": "starter_grant_edcoins",
+            "type": "u64"
+          },
+          {
+            "name": "starter_armor_tenths",
+            "type": "u16"
+          },
+          {
+            "name": "starter_weapon_tenths",
+            "type": "u16"
+          },
+          {
+            "name": "sol_to_edcoins_rate",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ListingStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Active"
+          },
+          {
+            "name": "Sold"
+          },
+          {
+            "name": "Canceled"
+          },
+          {
+            "name": "Expired"
+          }
+        ]
+      }
+    },
+    {
+      "name": "LoadoutPointKind",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Armor"
+          },
+          {
+            "name": "Weapon"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MarketplaceListing",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "schema_version",
+            "type": "u16"
+          },
+          {
+            "name": "listing_id",
+            "type": "u64"
+          },
+          {
+            "name": "seller_profile",
+            "type": "pubkey"
+          },
+          {
+            "name": "asset_id",
+            "type": "pubkey"
+          },
+          {
+            "name": "price_edcoins",
+            "type": "u64"
+          },
+          {
+            "name": "fee_paid_edcoins",
+            "type": "u64"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "ListingStatus"
+              }
+            }
+          },
+          {
+            "name": "buyer_profile",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "settled_at",
+            "type": {
+              "option": "i64"
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "PlayerProfile",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "schema_version",
+            "type": "u16"
+          },
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "grant_claimed",
+            "type": "bool"
+          },
+          {
+            "name": "profile_created_at",
+            "type": "i64"
+          },
+          {
+            "name": "edcoins_balance",
+            "type": "u64"
+          },
+          {
+            "name": "armor_point_balance",
+            "type": "u16"
+          },
+          {
+            "name": "weapon_point_balance",
+            "type": "u16"
+          },
+          {
+            "name": "warehouse_nonce",
+            "type": "u64"
+          },
+          {
+            "name": "next_raid_id",
+            "type": "u64"
+          },
+          {
+            "name": "active_raid",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RaidResult",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Succeeded"
+          },
+          {
+            "name": "Failed"
+          },
+          {
+            "name": "TimedOut"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RaidSession",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "schema_version",
+            "type": "u16"
+          },
+          {
+            "name": "raid_id",
+            "type": "u64"
+          },
+          {
+            "name": "player_profile",
+            "type": "pubkey"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "RaidStatus"
+              }
+            }
+          },
+          {
+            "name": "locked_difficulty",
+            "type": "pubkey"
+          },
+          {
+            "name": "locked_difficulty_id",
+            "type": "u64"
+          },
+          {
+            "name": "locked_difficulty_version",
+            "type": "u32"
+          },
+          {
+            "name": "entry_fee_paid",
+            "type": "u64"
+          },
+          {
+            "name": "selected_safe_case",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "safe_case_capacity",
+            "type": "u8"
+          },
+          {
+            "name": "safe_case_selection",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "armor_asset",
+            "type": "pubkey"
+          },
+          {
+            "name": "weapon_asset",
+            "type": "pubkey"
+          },
+          {
+            "name": "current_armor_tenths",
+            "type": "u16"
+          },
+          {
+            "name": "current_weapon_tenths",
+            "type": "u16"
+          },
+          {
+            "name": "current_area",
+            "type": {
+              "defined": {
+                "name": "RiskLevel"
+              }
+            }
+          },
+          {
+            "name": "area_states",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "RiskAreaRuntime"
+                }
+              }
+            }
+          },
+          {
+            "name": "pending_loot",
+            "type": {
+              "option": "pubkey"
+            }
+          },
+          {
+            "name": "carried_loot",
+            "type": {
+              "vec": "pubkey"
+            }
+          },
+          {
+            "name": "random_events",
+            "type": {
+              "vec": {
+                "defined": {
+                  "name": "RandomEventAudit"
+                }
+              }
+            }
+          },
+          {
+            "name": "started_at",
+            "type": "i64"
+          },
+          {
+            "name": "settled_at",
+            "type": {
+              "option": "i64"
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RaidStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Preparing"
+          },
+          {
+            "name": "Active"
+          },
+          {
+            "name": "PendingBattle"
+          },
+          {
+            "name": "Extracting"
+          },
+          {
+            "name": "Succeeded"
+          },
+          {
+            "name": "Failed"
+          },
+          {
+            "name": "TimedOut"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RandomEventAudit",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "event_id",
+            "type": "u64"
+          },
+          {
+            "name": "event_type",
+            "type": {
+              "defined": {
+                "name": "RandomEventType"
+              }
+            }
+          },
+          {
+            "name": "final_random_value",
+            "type": "u64"
+          },
+          {
+            "name": "threshold",
+            "type": "u16"
+          },
+          {
+            "name": "outcome",
+            "type": {
+              "defined": {
+                "name": "RandomOutcome"
+              }
+            }
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RandomEventType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "EncounterCheck"
+          },
+          {
+            "name": "BattleResult"
+          },
+          {
+            "name": "LootDrop"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RandomOutcome",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "NoEncounter"
+          },
+          {
+            "name": "Encounter"
+          },
+          {
+            "name": "PlayerWon"
+          },
+          {
+            "name": "PlayerLost"
+          },
+          {
+            "name": "LootCommon"
+          },
+          {
+            "name": "LootUncommon"
+          },
+          {
+            "name": "LootRare"
+          },
+          {
+            "name": "LootEpic"
+          },
+          {
+            "name": "LootLegendary"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RiskAreaConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "risk_level",
+            "type": {
+              "defined": {
+                "name": "RiskLevel"
+              }
+            }
+          },
+          {
+            "name": "area_count",
+            "type": "u8"
+          },
+          {
+            "name": "base_encounter_percent",
+            "type": "u16"
+          },
+          {
+            "name": "enemy_combat_min_tenths",
+            "type": "u16"
+          },
+          {
+            "name": "enemy_combat_max_tenths",
+            "type": "u16"
+          },
+          {
+            "name": "loot_weight_total",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RiskAreaRuntime",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "risk_level",
+            "type": {
+              "defined": {
+                "name": "RiskLevel"
+              }
+            }
+          },
+          {
+            "name": "containers_total",
+            "type": "u8"
+          },
+          {
+            "name": "containers_opened",
+            "type": "u8"
+          },
+          {
+            "name": "same_area_increment_points",
+            "type": "u16"
+          },
+          {
+            "name": "area_change_increment_points",
+            "type": "u16"
+          },
+          {
+            "name": "effective_encounter_chance",
+            "type": "u16"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RiskLevel",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Low"
+          },
+          {
+            "name": "Medium"
+          },
+          {
+            "name": "High"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SessionToken",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "authority",
+            "type": "pubkey"
+          },
+          {
+            "name": "target_program",
+            "type": "pubkey"
+          },
+          {
+            "name": "session_signer",
+            "type": "pubkey"
+          },
+          {
+            "name": "valid_until",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "WarehouseAsset",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "schema_version",
+            "type": "u16"
+          },
+          {
+            "name": "asset_id",
+            "type": "u64"
+          },
+          {
+            "name": "owner_profile",
+            "type": "pubkey"
+          },
+          {
+            "name": "asset_type",
+            "type": {
+              "defined": {
+                "name": "AssetType"
+              }
+            }
+          },
+          {
+            "name": "quality",
+            "type": {
+              "option": {
+                "defined": {
+                  "name": "AssetQuality"
+                }
+              }
+            }
+          },
+          {
+            "name": "collectible_code",
+            "type": "string"
+          },
+          {
+            "name": "armor_tenths",
+            "type": "u16"
+          },
+          {
+            "name": "weapon_tenths",
+            "type": "u16"
+          },
+          {
+            "name": "safe_case_capacity",
+            "type": "u8"
+          },
+          {
+            "name": "tradable",
+            "type": "bool"
+          },
+          {
+            "name": "locked_state",
+            "type": {
+              "defined": {
+                "name": "AssetLockState"
+              }
+            }
+          },
+          {
+            "name": "created_from",
+            "type": "u8"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    }
+  ]
+}
