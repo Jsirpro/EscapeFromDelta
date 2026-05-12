@@ -12,7 +12,7 @@
     "clients"
   ],
   "scripts": {
-    "dev": "npm --workspace app run dev",
+    "dev": "node api.js && npm --workspace app run dev",
     "generate:client": "npm --workspace clients run generate",
     "test:program": "vitest run tests/program",
     "test:client": "npm --workspace clients run test",
