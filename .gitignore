@@ -11,8 +11,6 @@ dist/
 build/
 coverage/
 *.log
-.env
-.env.*
 !.env.example
 !app/.env.example
 .anchor/
@@ -24,7 +22,8 @@ test-results/
 Thumbs.db
 *.tmp
 *.swp
-.vscode/
 .idea/
 temp_auto_push.bat
 temp_interactive_push.bat
+branch_structure.json
+config.bat
