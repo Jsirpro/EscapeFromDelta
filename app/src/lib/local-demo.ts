@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import * as anchor from "@coral-xyz/anchor";
 import idl from "../../../target/idl/escape_from_delta.json";
 
@@ -517,11 +518,10 @@ export async function settleLocalDemoRaid(result: "succeeded" | "failed") {
 }
 
 function getProvider() {
-  process.env.ANCHOR_PROVIDER_URL = RPC_URL;
-  process.env.ANCHOR_WALLET = resolveWalletPath(
-    process.env.ANCHOR_WALLET ?? `${process.env.HOME}/.config/solana/dev.json`,
-  );
-  return anchor.AnchorProvider.local(RPC_URL, {
+  const connection = new anchor.web3.Connection(RPC_URL, {
+    commitment: "confirmed",
+  });
+  return new anchor.AnchorProvider(connection, resolveServerWallet(), {
     commitment: "confirmed",
     preflightCommitment: "confirmed",
   });
@@ -613,6 +613,64 @@ function resolveWalletPath(walletPath: string) {
     return `${process.env.HOME}/${walletPath.slice(2)}`;
   }
   return walletPath;
+}
+
+function resolveServerWallet() {
+  const secret = process.env.SERVER_WALLET_SECRET;
+  if (secret && secret.trim() !== "") {
+    return createServerWallet(keypairFromSecret(secret));
+  }
+
+  process.env.ANCHOR_PROVIDER_URL = RPC_URL;
+  process.env.ANCHOR_WALLET = resolveWalletPath(
+    process.env.ANCHOR_WALLET ?? `${process.env.HOME}/.config/solana/dev.json`,
+  );
+  return createServerWallet(keypairFromSecret(requireServerWalletFileSecret()));
+}
+
+function keypairFromSecret(secret: string) {
+  try {
+    const parsed = JSON.parse(secret);
+    if (!Array.isArray(parsed)) {
+      throw new Error("SERVER_WALLET_SECRET must be a JSON array");
+    }
+    return anchor.web3.Keypair.fromSecretKey(Uint8Array.from(parsed));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`invalid-server-wallet-secret:${message}`);
+  }
+}
+
+function requireServerWalletFileSecret() {
+  const walletPath = process.env.ANCHOR_WALLET;
+  if (!walletPath) {
+    throw new Error("missing-anchor-wallet-path");
+  }
+  return readFileSync(walletPath, { encoding: "utf-8" });
+}
+
+function createServerWallet(payer: anchor.web3.Keypair) {
+  return {
+    publicKey: payer.publicKey,
+    async signTransaction<T extends anchor.web3.Transaction | anchor.web3.VersionedTransaction>(transaction: T) {
+      if (transaction instanceof anchor.web3.VersionedTransaction) {
+        transaction.sign([payer]);
+        return transaction;
+      }
+      transaction.partialSign(payer);
+      return transaction;
+    },
+    async signAllTransactions<T extends anchor.web3.Transaction | anchor.web3.VersionedTransaction>(transactions: T[]) {
+      return transactions.map((transaction) => {
+        if (transaction instanceof anchor.web3.VersionedTransaction) {
+          transaction.sign([payer]);
+          return transaction;
+        }
+        transaction.partialSign(payer);
+        return transaction;
+      });
+    },
+  };
 }
 
 function deriveGameConfig() {
