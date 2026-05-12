@@ -36,7 +36,9 @@ pub struct SettleFailedRaid<'info> {
     pub system_program: Program<'info, System>,
 }
 
-pub fn handler<'info>(ctx: Context<'_, '_, '_, 'info, SettleFailedRaid<'info>>) -> Result<(u16, u16)> {
+pub fn handler<'info>(
+    ctx: Context<'_, '_, '_, 'info, SettleFailedRaid<'info>>,
+) -> Result<(u16, u16)> {
     let now = Clock::get()?.unix_timestamp;
     let player_profile = &mut ctx.accounts.player_profile;
     let raid_session = &mut ctx.accounts.raid_session;

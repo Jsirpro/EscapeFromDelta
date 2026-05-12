@@ -94,7 +94,12 @@
               },
               {
                 "kind": "account",
-                "path": "warehouse_asset"
+                "path": "seller_profile"
+              },
+              {
+                "kind": "account",
+                "path": "marketplace_listing.listing_id",
+                "account": "MarketplaceListing"
               }
             ]
           }
@@ -399,7 +404,12 @@
               },
               {
                 "kind": "account",
-                "path": "warehouse_asset"
+                "path": "seller_profile"
+              },
+              {
+                "kind": "account",
+                "path": "seller_profile.warehouse_nonce",
+                "account": "PlayerProfile"
               }
             ]
           }
@@ -1117,7 +1127,12 @@
               },
               {
                 "kind": "account",
-                "path": "warehouse_asset"
+                "path": "seller_profile"
+              },
+              {
+                "kind": "account",
+                "path": "marketplace_listing.listing_id",
+                "account": "MarketplaceListing"
               }
             ]
           }

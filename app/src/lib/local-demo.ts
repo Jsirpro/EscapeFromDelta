@@ -190,8 +190,9 @@ export async function buildCreateListingTransaction(
   const { provider, program } = await ensureLocalDemoSetup();
   const playerKey = new anchor.web3.PublicKey(player);
   const playerProfile = derivePlayerProfile(playerKey);
+  const playerAccount = await accounts(program).playerProfile.fetch(playerProfile);
   const warehouseAsset = new anchor.web3.PublicKey(warehouseAssetAddress);
-  const marketplaceListing = deriveMarketplaceListing(warehouseAsset);
+  const marketplaceListing = deriveMarketplaceListing(playerProfile, BigInt(playerAccount.warehouseNonce.toString()));
   const transaction = await program.methods
     .createListing(new anchor.BN(priceEdcoins))
     .accounts({
@@ -656,9 +657,11 @@ function deriveWarehouseAsset(playerProfile: anchor.web3.PublicKey, assetId: big
   )[0];
 }
 
-function deriveMarketplaceListing(warehouseAsset: anchor.web3.PublicKey) {
+function deriveMarketplaceListing(playerProfile: anchor.web3.PublicKey, listingId: bigint) {
+  const listingIdBytes = Buffer.alloc(8);
+  listingIdBytes.writeBigUInt64LE(listingId, 0);
   return anchor.web3.PublicKey.findProgramAddressSync(
-    [Buffer.from("listing"), warehouseAsset.toBuffer()],
+    [Buffer.from("listing"), playerProfile.toBuffer(), listingIdBytes],
     PROGRAM_ID,
   )[0];
 }

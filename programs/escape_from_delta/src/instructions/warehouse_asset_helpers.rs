@@ -29,7 +29,8 @@ pub fn create_collectible_assets_from_loot<'info>(
         next_asset_id = next_asset_id.checked_add(1).ok_or(EscapeError::ArithmeticOverflow)?;
         let asset_id_bytes = next_asset_id.to_le_bytes();
         let seeds_without_bump = [SEED_ASSET, owner_profile.as_ref(), asset_id_bytes.as_ref()];
-        let (expected_asset_key, bump) = Pubkey::find_program_address(&seeds_without_bump, &crate::ID);
+        let (expected_asset_key, bump) =
+            Pubkey::find_program_address(&seeds_without_bump, &crate::ID);
 
         require_keys_eq!(expected_asset_key, account_info.key(), EscapeError::InvalidAccount);
         require!(
@@ -49,11 +50,7 @@ pub fn create_collectible_assets_from_loot<'info>(
                 account_space as u64,
                 &crate::ID,
             ),
-            &[
-                payer.clone(),
-                account_info.clone(),
-                system_program.clone(),
-            ],
+            &[payer.clone(), account_info.clone(), system_program.clone()],
             &[&signer_seeds],
         )?;
 
@@ -105,7 +102,8 @@ fn derive_collectible_code(loot_pubkey: &Pubkey) -> String {
     } else {
         ("rare", 20u32)
     };
-    let pick_seed = (((bytes[3] as u32) << 16) | ((bytes[11] as u32) << 8) | (bytes[19] as u32)) & 0x00ff_ffff;
+    let pick_seed =
+        (((bytes[3] as u32) << 16) | ((bytes[11] as u32) << 8) | (bytes[19] as u32)) & 0x00ff_ffff;
     let serial = (pick_seed % pool_size) + 1;
     format!("{prefix}_{serial:02}")
 }

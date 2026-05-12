@@ -2,7 +2,9 @@ use anchor_lang::prelude::*;
 use session_keys::{session_auth_or, Session, SessionError, SessionToken};
 
 use crate::errors::EscapeError;
-use crate::state::{PlayerProfile, RaidSession, RaidStatus, MAX_SAFE_CASE_CAPACITY, SEED_PLAYER, SEED_RAID};
+use crate::state::{
+    PlayerProfile, RaidSession, RaidStatus, MAX_SAFE_CASE_CAPACITY, SEED_PLAYER, SEED_RAID,
+};
 
 #[derive(Accounts, Session)]
 pub struct SelectSafeCaseItems<'info> {
@@ -32,17 +34,18 @@ pub struct SelectSafeCaseItems<'info> {
     ctx.accounts.player_profile.wallet.key() == ctx.accounts.signer.key(),
     SessionError::InvalidToken
 )]
-pub fn handler(ctx: Context<SelectSafeCaseItems>, selected_assets: Vec<Pubkey>, capacity: u8) -> Result<()> {
+pub fn handler(
+    ctx: Context<SelectSafeCaseItems>,
+    selected_assets: Vec<Pubkey>,
+    capacity: u8,
+) -> Result<()> {
     let raid_session = &mut ctx.accounts.raid_session;
     require!(raid_session.status == RaidStatus::Active, EscapeError::InvalidRaidState);
     require!(capacity <= MAX_SAFE_CASE_CAPACITY, EscapeError::InvalidSafeCaseSelection);
     require!(selected_assets.len() <= usize::from(capacity), EscapeError::InvalidSafeCaseSelection);
     require!(capacity == raid_session.safe_case_capacity, EscapeError::InvalidSafeCaseSelection);
     for asset in &selected_assets {
-        require!(
-            raid_session.carried_loot.contains(asset),
-            EscapeError::InvalidSafeCaseSelection
-        );
+        require!(raid_session.carried_loot.contains(asset), EscapeError::InvalidSafeCaseSelection);
     }
 
     raid_session.safe_case_capacity = capacity;

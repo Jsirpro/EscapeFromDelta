@@ -44,23 +44,20 @@ pub fn handler(
     require!(entry_fee > 0, EscapeError::InsufficientFunds);
     require_armor_range(armor_tenths)?;
     require_weapon_range(weapon_tenths)?;
-    require!(
-        safe_case_capacity <= MAX_SAFE_CASE_CAPACITY,
-        EscapeError::InvalidSafeCaseSelection
-    );
+    require!(safe_case_capacity <= MAX_SAFE_CASE_CAPACITY, EscapeError::InvalidSafeCaseSelection);
     let player_profile = &mut ctx.accounts.player_profile;
     let safe_case_fee = u64::from(safe_case_capacity)
         .checked_mul(SAFE_CASE_SLOT_PRICE_EDCOINS)
         .ok_or(EscapeError::ArithmeticOverflow)?;
-    let total_entry_fee = entry_fee
-        .checked_add(safe_case_fee)
-        .ok_or(EscapeError::ArithmeticOverflow)?;
+    let total_entry_fee =
+        entry_fee.checked_add(safe_case_fee).ok_or(EscapeError::ArithmeticOverflow)?;
     require!(player_profile.active_raid.is_none(), EscapeError::RaidAlreadyActive);
     require!(player_profile.edcoins_balance >= total_entry_fee, EscapeError::InsufficientFunds);
     require!(player_profile.armor_point_balance >= armor_tenths, EscapeError::InvalidEquipment);
     require!(player_profile.weapon_point_balance >= weapon_tenths, EscapeError::InvalidEquipment);
 
-    player_profile.edcoins_balance = checked_sub_u64(player_profile.edcoins_balance, total_entry_fee)?;
+    player_profile.edcoins_balance =
+        checked_sub_u64(player_profile.edcoins_balance, total_entry_fee)?;
     player_profile.armor_point_balance = player_profile
         .armor_point_balance
         .checked_sub(armor_tenths)

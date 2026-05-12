@@ -26,7 +26,8 @@ pub struct CancelListing<'info> {
     pub warehouse_asset: Account<'info, WarehouseAsset>,
     #[account(
         mut,
-        seeds = [SEED_LISTING, warehouse_asset.key().as_ref()],
+        close = seller,
+        seeds = [SEED_LISTING, seller_profile.key().as_ref(), &marketplace_listing.listing_id.to_le_bytes()],
         bump = marketplace_listing.bump,
         constraint = marketplace_listing.asset_id == warehouse_asset.key() @ EscapeError::InvalidListing,
         constraint = marketplace_listing.seller_profile == seller_profile.key() @ EscapeError::InvalidListing

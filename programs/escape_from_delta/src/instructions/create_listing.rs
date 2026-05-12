@@ -30,7 +30,7 @@ pub struct CreateListing<'info> {
         init,
         payer = seller,
         space = 8 + MarketplaceListing::INIT_SPACE,
-        seeds = [SEED_LISTING, warehouse_asset.key().as_ref()],
+        seeds = [SEED_LISTING, seller_profile.key().as_ref(), &seller_profile.warehouse_nonce.to_le_bytes()],
         bump
     )]
     pub marketplace_listing: Account<'info, MarketplaceListing>,
@@ -42,6 +42,7 @@ pub fn handler(ctx: Context<CreateListing>, price_edcoins: u64) -> Result<u64> {
 
     let fee_paid = listing_fee(price_edcoins)?;
     let seller_profile = &mut ctx.accounts.seller_profile;
+    let listing_id = seller_profile.warehouse_nonce;
     seller_profile.edcoins_balance = checked_sub_u64(seller_profile.edcoins_balance, fee_paid)?;
     seller_profile.warehouse_nonce =
         seller_profile.warehouse_nonce.checked_add(1).ok_or(EscapeError::ArithmeticOverflow)?;
@@ -57,7 +58,7 @@ pub fn handler(ctx: Context<CreateListing>, price_edcoins: u64) -> Result<u64> {
     let now = Clock::get()?.unix_timestamp;
     let listing = &mut ctx.accounts.marketplace_listing;
     listing.schema_version = SCHEMA_VERSION;
-    listing.listing_id = warehouse_asset.asset_id;
+    listing.listing_id = listing_id;
     listing.seller_profile = seller_profile.key();
     listing.asset_id = warehouse_asset.key();
     listing.price_edcoins = price_edcoins;

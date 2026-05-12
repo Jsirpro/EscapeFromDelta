@@ -61,10 +61,8 @@ pub fn handler_with_amount(
         }
     }
 
-    player_profile.warehouse_nonce = player_profile
-        .warehouse_nonce
-        .checked_add(1)
-        .ok_or(EscapeError::ArithmeticOverflow)?;
+    player_profile.warehouse_nonce =
+        player_profile.warehouse_nonce.checked_add(1).ok_or(EscapeError::ArithmeticOverflow)?;
 
     Ok(())
 }
